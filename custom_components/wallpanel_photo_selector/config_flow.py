@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -17,13 +19,17 @@ class WallPanelPhotoSelectorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN)
     async def async_step_user(self, user_input=None) -> FlowResult:
         errors = {}
         if user_input is not None:
-            path = user_input["media_path"]
-            if not path.startswith("/media/"):
+            path = Path(user_input["media_path"]).expanduser().resolve()
+            media_root = Path("/media").resolve()
+            if path == media_root or not path.is_relative_to(media_root):
                 errors["media_path"] = "invalid_path"
             else:
                 await self.async_set_unique_id(DOMAIN)
                 self._abort_if_unique_id_configured()
-                return self.async_create_entry(title="WallPanel Photo Selector", data=user_input)
+                return self.async_create_entry(
+                    title="WallPanel Photo Selector",
+                    data={**user_input, "media_path": str(path)},
+                )
 
         schema = vol.Schema({
             vol.Required("media_path", default=DEFAULT_MEDIA_PATH): str,
