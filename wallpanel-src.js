@@ -3365,15 +3365,15 @@ function initWallpanel() {
 				while (candidates.length) {
 					// Apply repeat avoidance only to the first N positions in the new
 					// order. Older photos remain in the cycle; they are not discarded.
-					let selectionPool = candidates;
-					if (ordered.length < historySize) {
-						const fresh = candidates.filter((item) => !recent.includes(item.url));
-						if (fresh.length) selectionPool = fresh;
-					}
-					let eligible = selectionPool;
+					// Orientation is a hard rule; repeat avoidance is secondary.
+					let eligible = candidates;
 					if (previousOrientation === "portrait") {
-						const landscapes = selectionPool.filter((item) => item.orientation === "landscape");
+						const landscapes = candidates.filter((item) => item.orientation === "landscape");
 						if (landscapes.length) eligible = landscapes;
+					}
+					if (ordered.length < historySize) {
+						const fresh = eligible.filter((item) => !recent.includes(item.url));
+						if (fresh.length) eligible = fresh;
 					}
 					// Exponential-race weighted sampling: every photo appears once per
 					// cycle, while higher Lightroom ratings are more likely to appear early.
