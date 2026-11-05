@@ -3351,12 +3351,19 @@ function initWallpanel() {
 				}).filter(Boolean);
 					if (candidates.length < 2) return urls;
 
+				// Avoid immediately replaying the last few selections after a media
+				// list refresh, while retaining a fallback for small libraries.
+				const recent = this.photoSelectorRecent || [];
+				const freshCandidates = candidates.filter((item) => !recent.includes(item.url));
+				const selectionPool = freshCandidates.length >= Math.min(3, candidates.length)
+					? freshCandidates : candidates;
+
 				const ordered = [];
 				let previousOrientation = null;
-				while (candidates.length) {
-					let eligible = candidates;
+				while (selectionPool.length) {
+					let eligible = selectionPool;
 					if (previousOrientation === "portrait") {
-						const landscapes = candidates.filter((item) => item.orientation === "landscape");
+						const landscapes = selectionPool.filter((item) => item.orientation === "landscape");
 						if (landscapes.length) eligible = landscapes;
 					}
 					// Exponential-race weighted sampling: every photo appears once per
@@ -3369,7 +3376,7 @@ function initWallpanel() {
 					}
 					ordered.push(selected.url);
 					previousOrientation = selected.orientation;
-					candidates.splice(candidates.indexOf(selected), 1);
+					selectionPool.splice(selectionPool.indexOf(selected), 1);
 				}
 				const selectedUrls = new Set(ordered);
 				return ordered.concat(urls.filter((url) => !selectedUrls.has(url)));
@@ -4125,6 +4132,11 @@ function initWallpanel() {
 			}
 			if (updateIndex) {
 				this.mediaIndex = mediaIndex;
+				if (config.photo_selector_enabled && config.media_order == "random") {
+					this.photoSelectorRecent = this.photoSelectorRecent || [];
+					this.photoSelectorRecent.push(this.mediaList[mediaIndex]);
+					this.photoSelectorRecent = this.photoSelectorRecent.slice(-5);
+				}
 			}
 			return this.mediaList[mediaIndex];
 		}
