@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 from typing import Any
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg"}
-XMP_HEADER = b"http://ns.adobe.com/xap/1.0/\\x00"
+XMP_HEADER = b"http://ns.adobe.com/xap/1.0/\x00"
 XMP_NAMESPACE = "{http://ns.adobe.com/xap/1.0/}"
 RDF_NAMESPACE = "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}"
 SOF_MARKERS = {
