@@ -44,6 +44,7 @@ async def websocket_get_photos(hass: HomeAssistant, connection, msg) -> None:
     ]
     connection.send_result(msg["id"], {
         "photos": photos,
+        "media_folder": Path(data["media_path"]).name,
         "last_scan": data.get("last_scan"),
     })
 
