@@ -3342,13 +3342,20 @@ function initWallpanel() {
 				const candidates = urls.map((url) => {
 					const marker = "/local/";
 						const position = url.indexOf(marker);
-						if (position < 0) return null;
-						let relativePath;
-						try { relativePath = decodeURIComponent(url.slice(position + marker.length)); }
-						catch (_error) { relativePath = url.slice(position + marker.length); }
-						if (folderPrefix && relativePath.startsWith(folderPrefix)) relativePath = relativePath.slice(folderPrefix.length);
-						const photo = metadata.get(relativePath);
-						return photo ? { url, weight: Math.max(1, Number(photo.rating) || 0), orientation: photo.orientation } : null;
+					if (position < 0) return null;
+					let relativePath;
+					try {
+						relativePath = decodeURIComponent(url.slice(position + marker.length));
+					} catch (_error) {
+						relativePath = url.slice(position + marker.length);
+					}
+					if (folderPrefix && relativePath.startsWith(folderPrefix)) {
+						relativePath = relativePath.slice(folderPrefix.length);
+					}
+					const photo = metadata.get(relativePath);
+					return photo
+						? { url, weight: Math.max(1, Number(photo.rating) || 0), orientation: photo.orientation }
+						: null;
 				}).filter(Boolean);
 				// Do not partially reorder a list: unmatched entries have unknown
 				// orientation and would invalidate the portrait-to-landscape rule.
@@ -3390,13 +3397,9 @@ function initWallpanel() {
 				// Make the order safe when playback wraps from its final item to
 				// its first. Rotating to a landscape preserves every adjacent pair.
 				if (ordered.length > 1 && orientationByUrl.get(ordered[ordered.length - 1]) === "portrait") {
-					const firstLandscape = ordered.findIndex((url) => {
-						try {
-							let path = decodeURIComponent(url.slice(url.indexOf("/local/") + 7));
-							if (folderPrefix && path.startsWith(folderPrefix)) path = path.slice(folderPrefix.length);
-							return metadata.get(path)?.orientation === "landscape";
-						} catch (_error) { return false; }
-					});
+					const firstLandscape = ordered.findIndex(
+						(url) => orientationByUrl.get(url) === "landscape"
+					);
 					if (firstLandscape > 0) ordered.push(...ordered.splice(0, firstLandscape));
 				}
 				const selectedUrls = new Set(ordered);
