@@ -58,8 +58,8 @@ def _jpeg_metadata(path: Path) -> tuple[int | None, int | None, int]:
 
             if marker == 0xE1:
                 payload = image.read(payload_length)
-                if payload.startswith(XMP_NAMESPACE.encode("ascii")):
-                    packet = payload[len(XMP_NAMESPACE):].rstrip(b"\x00")
+                if payload.startswith(XMP_HEADER):
+                    packet = payload[len(XMP_HEADER):].rstrip(b"\x00")
                     parsed_rating = _extract_rating(packet)
                     if parsed_rating is not None:
                         rating = parsed_rating
