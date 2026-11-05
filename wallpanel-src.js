@@ -3359,6 +3359,7 @@ function initWallpanel() {
 				const historySize = Math.max(0, Math.min(100, Number(config.photo_selector_history_size ?? 5) || 0));
 				const recent = historySize ? (this.photoSelectorRecent || []).slice(-historySize) : [];
 
+				const orientationByUrl = new Map(candidates.map((item) => [item.url, item.orientation]));
 				const ordered = [];
 				let previousOrientation = null;
 				while (candidates.length) {
@@ -3388,8 +3389,7 @@ function initWallpanel() {
 				}
 				// Make the order safe when playback wraps from its final item to
 				// its first. Rotating to a landscape preserves every adjacent pair.
-				if (ordered.length > 1 && ordered[ordered.length - 1] &&
-					metadata.get(decodeURIComponent(ordered[ordered.length - 1].split("/local/").pop()))?.orientation === "portrait") {
+				if (ordered.length > 1 && orientationByUrl.get(ordered[ordered.length - 1]) === "portrait") {
 					const firstLandscape = ordered.findIndex((url) => {
 						try {
 							let path = decodeURIComponent(url.slice(url.indexOf("/local/") + 7));
