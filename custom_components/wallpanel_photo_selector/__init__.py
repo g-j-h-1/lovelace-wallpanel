@@ -8,6 +8,8 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
+import voluptuous as vol
+from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
@@ -18,9 +20,36 @@ from .scanner import scan_photo_directory
 
 _LOGGER = logging.getLogger(__name__)
 STORAGE_VERSION = 1
+WS_TYPE = f"{DOMAIN}/photos"
+
+
+@websocket_api.websocket_command({vol.Required("type"): WS_TYPE})
+@websocket_api.async_response
+async def websocket_get_photos(hass: HomeAssistant, connection, msg) -> None:
+    """Return the current indexed photo metadata to a WallPanel client."""
+    entries = hass.data.get(DOMAIN, {})
+    if not entries:
+        connection.send_result(msg["id"], {"photos": [], "last_scan": None})
+        return
+    # One integration entry is enforced by the config flow's unique ID.
+    data = next(iter(entries.values()))
+    photos = [
+        {
+            "path": item["path"],
+            "rating": item.get("rating", 0),
+            "weight": max(1, int(item.get("rating", 0))),
+            "orientation": item.get("orientation", "unknown"),
+        }
+        for item in data["photos"].values()
+    ]
+    connection.send_result(msg["id"], {
+        "photos": photos,
+        "last_scan": data.get("last_scan"),
+    })
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
+    websocket_api.async_register_command(hass, websocket_get_photos)
     return True
 
 
