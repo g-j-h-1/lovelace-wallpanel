@@ -3386,6 +3386,19 @@ function initWallpanel() {
 					previousOrientation = selected.orientation;
 					candidates.splice(candidates.indexOf(selected), 1);
 				}
+				// Make the order safe when playback wraps from its final item to
+				// its first. Rotating to a landscape preserves every adjacent pair.
+				if (ordered.length > 1 && ordered[ordered.length - 1] &&
+					metadata.get(decodeURIComponent(ordered[ordered.length - 1].split("/local/").pop()))?.orientation === "portrait") {
+					const firstLandscape = ordered.findIndex((url) => {
+						try {
+							let path = decodeURIComponent(url.slice(url.indexOf("/local/") + 7));
+							if (folderPrefix && path.startsWith(folderPrefix)) path = path.slice(folderPrefix.length);
+							return metadata.get(path)?.orientation === "landscape";
+						} catch (_error) { return false; }
+					});
+					if (firstLandscape > 0) ordered.push(...ordered.splice(0, firstLandscape));
+				}
 				const selectedUrls = new Set(ordered);
 				return ordered.concat(urls.filter((url) => !selectedUrls.has(url)));
 			} catch (error) {
