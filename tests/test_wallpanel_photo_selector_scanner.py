@@ -4,10 +4,16 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from custom_components.wallpanel_photo_selector.scanner import (
-    _jpeg_metadata,
-    scan_photo_directory,
-)
+# Load scanner.py directly so these unit tests do not require a full
+# Home Assistant installation just to import the integration package.
+import importlib.util
+
+SCANNER_PATH = Path(__file__).parents[1] / "custom_components" / "wallpanel_photo_selector" / "scanner.py"
+SPEC = importlib.util.spec_from_file_location("wallpanel_photo_selector_scanner", SCANNER_PATH)
+SCANNER = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(SCANNER)
+_jpeg_metadata = SCANNER._jpeg_metadata
+scan_photo_directory = SCANNER.scan_photo_directory
 
 
 XMP_HEADER = b"http://ns.adobe.com/xap/1.0/\x00"
