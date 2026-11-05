@@ -3356,13 +3356,17 @@ function initWallpanel() {
 				// list refresh, while retaining a fallback for small libraries.
 				const historySize = Math.max(0, Math.min(100, Number(config.photo_selector_history_size ?? 5) || 0));
 				const recent = historySize ? (this.photoSelectorRecent || []).slice(-historySize) : [];
-				const freshCandidates = candidates.filter((item) => !recent.includes(item.url));
-				const selectionPool = freshCandidates.length >= Math.min(3, candidates.length)
-					? freshCandidates : candidates;
 
 				const ordered = [];
 				let previousOrientation = null;
-				while (selectionPool.length) {
+				while (candidates.length) {
+					// Apply repeat avoidance only to the first N positions in the new
+					// order. Older photos remain in the cycle; they are not discarded.
+					let selectionPool = candidates;
+					if (ordered.length < historySize) {
+						const fresh = candidates.filter((item) => !recent.includes(item.url));
+						if (fresh.length) selectionPool = fresh;
+					}
 					let eligible = selectionPool;
 					if (previousOrientation === "portrait") {
 						const landscapes = selectionPool.filter((item) => item.orientation === "landscape");
