@@ -106,17 +106,21 @@ def scan_photo_directory(
     current: dict[str, dict[str, Any]] = {}
     added = modified = unchanged = 0
     for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.suffix.lower() not in IMAGE_SUFFIXES:
+        if path.suffix.lower() not in IMAGE_SUFFIXES:
             continue
-        relative = path.relative_to(root).as_posix()
         try:
-            stat = path.stat()
+            # Do not follow symlinks out of the configured media directory.
+            resolved_path = path.resolve(strict=True)
+            if not resolved_path.is_relative_to(root) or not resolved_path.is_file():
+                continue
+            relative = path.relative_to(root).as_posix()
+            stat = resolved_path.stat()
             old = previous.get(relative)
             if old and old.get("mtime_ns") == stat.st_mtime_ns and old.get("size") == stat.st_size:
                 current[relative] = old
                 unchanged += 1
                 continue
-            width, height, rating = _jpeg_metadata(path)
+            width, height, rating = _jpeg_metadata(resolved_path)
             current[relative] = {
                 "path": relative,
                 "size": stat.st_size,
