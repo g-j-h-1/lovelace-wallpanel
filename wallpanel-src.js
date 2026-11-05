@@ -3337,6 +3337,7 @@ function initWallpanel() {
 			try {
 				const result = await this.hass.callWS({ type: "wallpanel_photo_selector/photos" });
 				const metadata = new Map((result.photos || []).map((photo) => [photo.path, photo]));
+				const folderPrefix = result.media_folder ? `${result.media_folder}/` : "";
 				const candidates = urls.map((url) => {
 					const marker = "/local/";
 						const position = url.indexOf(marker);
@@ -3344,6 +3345,7 @@ function initWallpanel() {
 						let relativePath;
 						try { relativePath = decodeURIComponent(url.slice(position + marker.length)); }
 						catch (_error) { relativePath = url.slice(position + marker.length); }
+						if (folderPrefix && relativePath.startsWith(folderPrefix)) relativePath = relativePath.slice(folderPrefix.length);
 						const photo = metadata.get(relativePath);
 						return photo ? { url, weight: Math.max(1, Number(photo.rating) || 0), orientation: photo.orientation } : null;
 				}).filter(Boolean);
