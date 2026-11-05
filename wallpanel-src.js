@@ -3350,7 +3350,9 @@ function initWallpanel() {
 						const photo = metadata.get(relativePath);
 						return photo ? { url, weight: Math.max(1, Number(photo.rating) || 0), orientation: photo.orientation } : null;
 				}).filter(Boolean);
-					if (candidates.length < 2) return urls;
+				// Do not partially reorder a list: unmatched entries have unknown
+				// orientation and would invalidate the portrait-to-landscape rule.
+				if (candidates.length !== urls.length || candidates.length < 2) return urls;
 
 				// Avoid immediately replaying the last few selections after a media
 				// list refresh, while retaining a fallback for small libraries.
@@ -3382,12 +3384,12 @@ function initWallpanel() {
 					}
 					ordered.push(selected.url);
 					previousOrientation = selected.orientation;
-					selectionPool.splice(selectionPool.indexOf(selected), 1);
+					candidates.splice(candidates.indexOf(selected), 1);
 				}
 				const selectedUrls = new Set(ordered);
 				return ordered.concat(urls.filter((url) => !selectedUrls.has(url)));
 			} catch (error) {
-				logger.warning("Photo Selector metadata unavailable; using normal WallPanel ordering", error);
+				logger.warn("Photo Selector metadata unavailable; using normal WallPanel ordering", error);
 				return urls;
 			}
 		}
