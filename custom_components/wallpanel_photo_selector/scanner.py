@@ -104,6 +104,7 @@ def scan_photo_directory(
         raise FileNotFoundError(f"Photo directory does not exist: {root}")
 
     current: dict[str, dict[str, Any]] = {}
+    seen: set[str] = set()
     added = modified = unchanged = 0
     for path in sorted(root.rglob("*")):
         if not path.is_file() or path.suffix.lower() not in IMAGE_SUFFIXES:
@@ -111,6 +112,7 @@ def scan_photo_directory(
         try:
             stat = path.stat()
             relative = path.relative_to(root).as_posix()
+            seen.add(relative)
             old = previous.get(relative)
             if old and old.get("mtime_ns") == stat.st_mtime_ns and old.get("size") == stat.st_size:
                 current[relative] = old
@@ -137,11 +139,13 @@ def scan_photo_directory(
             else:
                 modified += 1
         except (OSError, ValueError):
-            # Keep the next scan eligible to retry an unreadable/partially
-            # copied image rather than adding an incomplete cache record.
+            # Preserve an existing record while a file is temporarily unreadable
+            # (for example, while it is being copied); retry it next scan.
+            if relative in previous:
+                current[relative] = previous[relative]
             continue
 
-    deleted = len(set(previous) - set(current))
+    deleted = len(set(previous) - seen)
     summary = {
         "found": len(current),
         "added": added,
