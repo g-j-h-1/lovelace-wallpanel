@@ -74,6 +74,7 @@ const defaultConfig = {
 	media_list_update_interval: 3600,
 	media_list_max_size: 500,
 	media_order: "random", // sorted / random / random_but_synced / random_path
+	photo_selector_enabled: false, // Use WallPanel Photo Selector metadata for local media sources
 	exclude_filenames: [], // Excluded filenames (regex)
 	exclude_media_types: [], // Exclude media types (image / video)
 	exclude_media_orientation: "", // Exclude media items with this orientation (landscape / portrait / auto)
@@ -3329,6 +3330,53 @@ function initWallpanel() {
 			}
 		}
 
+		async applyPhotoSelectorOrder(urls) {
+			if (!config.photo_selector_enabled || !mediaSourceType().startsWith("media-source")) {
+				return urls;
+			}
+			try {
+				const result = await this.hass.callWS({ type: "wallpanel_photo_selector/photos" });
+				const metadata = new Map((result.photos || []).map((photo) => [photo.path, photo]));
+				const candidates = urls.map((url) => {
+					const marker = "/local/";
+						const position = url.indexOf(marker);
+						if (position < 0) return null;
+						let relativePath;
+						try { relativePath = decodeURIComponent(url.slice(position + marker.length)); }
+						catch (_error) { relativePath = url.slice(position + marker.length); }
+						const photo = metadata.get(relativePath);
+						return photo ? { url, weight: Math.max(1, Number(photo.rating) || 0), orientation: photo.orientation } : null;
+				}).filter(Boolean);
+					if (candidates.length < 2) return urls;
+
+				const ordered = [];
+				let previousOrientation = null;
+				while (candidates.length) {
+					let eligible = candidates;
+					if (previousOrientation === "portrait") {
+						const landscapes = candidates.filter((item) => item.orientation === "landscape");
+						if (landscapes.length) eligible = landscapes;
+					}
+					// Exponential-race weighted sampling: every photo appears once per
+					// cycle, while higher Lightroom ratings are more likely to appear early.
+					let selected = eligible[0];
+					let bestKey = Infinity;
+					for (const item of eligible) {
+						const key = -Math.log(Math.max(Number.EPSILON, Math.random())) / item.weight;
+						if (key < bestKey) { bestKey = key; selected = item; }
+					}
+					ordered.push(selected.url);
+					previousOrientation = selected.orientation;
+					candidates.splice(candidates.indexOf(selected), 1);
+				}
+				const selectedUrls = new Set(ordered);
+				return ordered.concat(urls.filter((url) => !selectedUrls.has(url)));
+			} catch (error) {
+				logger.warning("Photo Selector metadata unavailable; using normal WallPanel ordering", error);
+				return urls;
+			}
+		}
+
 		async updateMediaListFromMediaSource() {
 			const mediaContentId = config.image_url;
 			const wp = this;
@@ -3342,7 +3390,9 @@ function initWallpanel() {
 
 				wp.resetMediaPathLists();
 				let urls = pathLists.flatMap((pathList) => pathList.medias);
-				if (config.media_order == "random") {
+				if (config.photo_selector_enabled && config.media_order == "random") {
+					urls = await wp.applyPhotoSelectorOrder(urls);
+				} else if (config.media_order == "random") {
 					urls = shuffleArray(urls);
 				} else if (config.media_order == "random_but_synced") {
 					// Sort for a stable base, then shuffle with a fixed seed so every
