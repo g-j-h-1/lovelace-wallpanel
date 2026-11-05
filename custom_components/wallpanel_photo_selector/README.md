@@ -7,7 +7,7 @@ An optional companion integration and WallPanel source change for rating-aware s
 - Recursively indexes JPEG/JPG files in the configured Home Assistant media folder (default: `/media/PortalPhotos`).
 - Reads Lightroom XMP star ratings and JPEG pixel dimensions.
 - Treats unrated and 1-star images equally (weight 1); 2–5 stars use their numeric rating as the selection weight.
-- Builds a weighted random order without repeating an indexed image within that order.
+- Builds a weighted random order without repeating an indexed image within that order, and avoids the last five selections after a media-list refresh when enough alternatives exist.
 - When the preceding selected image is portrait, it chooses a landscape next when one remains. If no landscape remains, it falls back to the remaining images rather than getting stuck.
 - Leaves WallPanel's image loading/rendering code and previous/next index navigation in place.
 - Falls back to normal WallPanel random ordering if the integration or metadata response is unavailable.
