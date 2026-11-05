@@ -109,9 +109,9 @@ def scan_photo_directory(
     for path in sorted(root.rglob("*")):
         if not path.is_file() or path.suffix.lower() not in IMAGE_SUFFIXES:
             continue
+        relative = path.relative_to(root).as_posix()
         try:
             stat = path.stat()
-            relative = path.relative_to(root).as_posix()
             seen.add(relative)
             old = previous.get(relative)
             if old and old.get("mtime_ns") == stat.st_mtime_ns and old.get("size") == stat.st_size:
