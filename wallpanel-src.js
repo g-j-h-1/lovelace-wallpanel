@@ -75,6 +75,7 @@ const defaultConfig = {
 	media_list_max_size: 500,
 	media_order: "random", // sorted / random / random_but_synced / random_path
 	photo_selector_enabled: false, // Use WallPanel Photo Selector metadata for local media sources
+		photo_selector_history_size: 5, // Number of recently displayed photos to avoid after a list refresh (0 disables)
 	exclude_filenames: [], // Excluded filenames (regex)
 	exclude_media_types: [], // Exclude media types (image / video)
 	exclude_media_orientation: "", // Exclude media items with this orientation (landscape / portrait / auto)
@@ -3353,7 +3354,8 @@ function initWallpanel() {
 
 				// Avoid immediately replaying the last few selections after a media
 				// list refresh, while retaining a fallback for small libraries.
-				const recent = this.photoSelectorRecent || [];
+				const historySize = Math.max(0, Math.min(100, Number(config.photo_selector_history_size ?? 5) || 0));
+				const recent = historySize ? (this.photoSelectorRecent || []).slice(-historySize) : [];
 				const freshCandidates = candidates.filter((item) => !recent.includes(item.url));
 				const selectionPool = freshCandidates.length >= Math.min(3, candidates.length)
 					? freshCandidates : candidates;
@@ -4135,7 +4137,10 @@ function initWallpanel() {
 				if (config.photo_selector_enabled && config.media_order == "random") {
 					this.photoSelectorRecent = this.photoSelectorRecent || [];
 					this.photoSelectorRecent.push(this.mediaList[mediaIndex]);
-					this.photoSelectorRecent = this.photoSelectorRecent.slice(-5);
+					const historySize = Math.max(0, Math.min(100, Number(config.photo_selector_history_size ?? 5) || 0));
+					this.photoSelectorRecent = historySize
+						? this.photoSelectorRecent.slice(-historySize)
+						: [];
 				}
 			}
 			return this.mediaList[mediaIndex];
