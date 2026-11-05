@@ -7,7 +7,7 @@ An optional companion integration and WallPanel source change for rating-aware s
 - Recursively indexes JPEG/JPG files in the configured Home Assistant media folder (default: `/media/PortalPhotos`).
 - Reads Lightroom XMP star ratings and JPEG pixel dimensions.
 - Treats unrated and 1-star images equally (weight 1); 2–5 stars use their numeric rating as the selection weight.
-- Builds a weighted random order without repeating an indexed image within that order, and avoids the last five selections after a media-list refresh when enough alternatives exist.
+- Builds a weighted random order without repeating an indexed image within that order, and avoids a configurable number of recently displayed photos after a media-list refresh (default 5; set to 0 to disable).
 - When the preceding selected image is portrait, it chooses a landscape next when one remains. If no landscape remains, it falls back to the remaining images rather than getting stuck.
 - Leaves WallPanel's image loading/rendering code and previous/next index navigation in place.
 - Falls back to normal WallPanel random ordering if the integration or metadata response is unavailable.
@@ -35,6 +35,7 @@ Add this option to the WallPanel YAML configuration:
 ```yaml
 wallpanel:
   photo_selector_enabled: true
+  photo_selector_history_size: 5  # 0–100; number of recent photos to avoid
 ```
 
 Keep `media_order: random` and point `image_url` at the same local media folder, for example:
@@ -50,7 +51,7 @@ If `photo_selector_enabled` is omitted or false, normal WallPanel behaviour is r
 
 ## Selection details and limitations
 
-The algorithm uses weighted sampling without replacement to create a shuffled cycle. A 5-star image has five times the selection weight of an unrated/1-star image while candidates remain. This is a relative weighting, not a guarantee that every 5-star image appears before every lower-rated image.
+The repeat-history setting is configured in WallPanel YAML, not in the Home Assistant integration. Set `photo_selector_history_size` from 0 to 100; 0 disables cross-refresh history. The default is 5. History is held in memory for the lifetime of the WallPanel card, so it resets when the card is reloaded. The algorithm uses weighted sampling without replacement to create a shuffled cycle. A 5-star image has five times the selection weight of an unrated/1-star image while candidates remain. This is a relative weighting, not a guarantee that every 5-star image appears before every lower-rated image.
 
 The portrait-to-landscape rule applies within the generated order. If the library has no eligible landscape remaining, it relaxes the rule so playback continues. Square/unknown images are not treated as landscape.
 
