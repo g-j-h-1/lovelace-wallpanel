@@ -1,0 +1,9 @@
+{
+  "domain": "wallpanel_photo_selector",
+  "name": "WallPanel Photo Selector",
+  "version": "0.1.0",
+  "documentation": "https://github.com/g-j-h-1/lovelace-wallpanel",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": []
+}
