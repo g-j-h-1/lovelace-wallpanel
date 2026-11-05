@@ -1,0 +1,28 @@
+name: Photo Selector Tests
+
+on:
+  push:
+    branches: [photo-selection]
+    paths:
+      - "custom_components/wallpanel_photo_selector/**"
+      - "tests/test_wallpanel_photo_selector_scanner.py"
+      - ".github/workflows/photo-selector-tests.yml"
+  pull_request:
+    branches: [photo-selection]
+    paths:
+      - "custom_components/wallpanel_photo_selector/**"
+      - "tests/test_wallpanel_photo_selector_scanner.py"
+      - ".github/workflows/photo-selector-tests.yml"
+
+jobs:
+  scanner-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run scanner unit tests
+        run: python -m unittest discover -s tests -v
