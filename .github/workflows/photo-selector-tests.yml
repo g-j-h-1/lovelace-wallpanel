@@ -5,7 +5,7 @@ on:
     branches: [photo-selection]
     paths:
       - "custom_components/wallpanel_photo_selector/**"
-      - "tests/test_wallpanel_photo_selector_scanner.py"
+      - "tests/test_wallpanel_photo_selector_scanner.py"\n      - "tests/photo-selector.test.mjs"\n      - "photo-selector.mjs"\n      - "wallpanel-src.js"
       - ".github/workflows/photo-selector-tests.yml"
   pull_request:
     branches: [photo-selection]
