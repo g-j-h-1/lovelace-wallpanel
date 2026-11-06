@@ -69,6 +69,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async with data["lock"]:
             data["scan_status"] = "scanning"
             data["scan_error"] = None
+            async_dispatcher_send(hass, f"{DOMAIN}_updated_{entry.entry_id}")
             try:
                 photos, summary = await hass.async_add_executor_job(
                     scan_photo_directory, media_path, data["photos"]
