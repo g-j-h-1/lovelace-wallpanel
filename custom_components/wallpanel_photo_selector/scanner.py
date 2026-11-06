@@ -10,8 +10,6 @@ from typing import Any
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg"}
 XMP_HEADER = b"http://ns.adobe.com/xap/1.0/\x00"
-XMP_NAMESPACE = "{http://ns.adobe.com/xap/1.0/}"
-RDF_NAMESPACE = "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}"
 SOF_MARKERS = {
     0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
     0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF,
@@ -26,11 +24,8 @@ def _jpeg_metadata(path: Path) -> tuple[int | None, int | None, int]:
         if image.read(2) != b"\xff\xd8":
             raise ValueError("Not a JPEG file")
         while True:
-            marker_start = image.read(1)
-            if not marker_start:
+            if image.read(1) != b"\xff":
                 break
-            if marker_start != b"\xff":
-                continue
             marker_byte = image.read(1)
             while marker_byte == b"\xff":
                 marker_byte = image.read(1)
@@ -48,39 +43,28 @@ def _jpeg_metadata(path: Path) -> tuple[int | None, int | None, int]:
             if segment_length < 2:
                 break
             payload_length = segment_length - 2
-
-            if marker in SOF_MARKERS:
-                payload = image.read(payload_length)
-                if len(payload) >= 5:
-                    height = int.from_bytes(payload[1:3], "big")
-                    width = int.from_bytes(payload[3:5], "big")
-                continue
-
             if marker == 0xE1:
                 payload = image.read(payload_length)
                 if payload.startswith(XMP_HEADER):
                     packet = payload[len(XMP_HEADER):].rstrip(b"\x00")
-                    parsed_rating = _extract_rating(packet)
-                    if parsed_rating is not None:
-                        rating = parsed_rating
-                continue
-            image.seek(payload_length, 1)
-
+                    rating = _extract_rating(packet) or 0
+            elif marker in SOF_MARKERS:
+                payload = image.read(payload_length)
+                if len(payload) >= 5:
+                    height = int.from_bytes(payload[1:3], "big")
+                    width = int.from_bytes(payload[3:5], "big")
+            else:
+                image.seek(payload_length, 1)
     return width, height, rating
 
 
 def _extract_rating(packet: bytes) -> int | None:
-    """Read xmp:Rating from either RDF attributes or element text."""
+    """Read xmp:Rating from RDF attributes or element text."""
     try:
         root = ET.fromstring(packet)
     except ET.ParseError:
-        # Lightroom normally writes a simple xmp:Rating attribute. This
-        # fallback handles packets with harmless XML declarations/leading bytes.
         match = re.search(rb'<(?:[A-Za-z0-9_-]+:)?Description\b[^>]*\bxmp:Rating=["\'](-?\d+)["\']', packet)
-        if match:
-            return max(0, min(5, int(match.group(1))))
-        return None
-
+        return max(0, min(5, int(match.group(1)))) if match else None
     for element in root.iter():
         for key, value in element.attrib.items():
             if key.rsplit("}", 1)[-1] == "Rating":
@@ -99,20 +83,21 @@ def _extract_rating(packet: bytes) -> int | None:
 def scan_photo_directory(
     root: Path, previous: dict[str, dict[str, Any]]
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
-    """Scan recursively, parsing only new or changed JPEGs and pruning deletions."""
+    """Scan recursively and return indexed metadata plus a diagnostic summary."""
     root = root.resolve()
     if not root.is_dir():
         raise FileNotFoundError(f"Photo directory does not exist: {root}")
 
     current: dict[str, dict[str, Any]] = {}
-    added = modified = unchanged = 0
+    added = modified = unchanged = unreadable = discovered = 0
     for path in sorted(root.rglob("*")):
         if path.suffix.lower() not in IMAGE_SUFFIXES:
             continue
+        discovered += 1
         try:
-            # Do not follow symlinks out of the configured media directory.
             resolved_path = path.resolve(strict=True)
             if not resolved_path.is_relative_to(root) or not resolved_path.is_file():
+                unreadable += 1
                 continue
             relative = path.relative_to(root).as_posix()
             stat = resolved_path.stat()
@@ -123,36 +108,32 @@ def scan_photo_directory(
                 continue
             width, height, rating = _jpeg_metadata(resolved_path)
             current[relative] = {
-                "path": relative,
-                "size": stat.st_size,
-                "mtime_ns": stat.st_mtime_ns,
+                "path": relative, "size": stat.st_size, "mtime_ns": stat.st_mtime_ns,
                 "rating": rating,
                 "orientation": (
                     "landscape" if width and height and width > height
                     else "portrait" if width and height and height > width
-                    else "square" if width and height
-                    else "unknown"
+                    else "square" if width and height else "unknown"
                 ),
-                "width": width,
-                "height": height,
-                "weight": max(1, rating),
+                "width": width, "height": height, "weight": max(1, rating),
             }
             if old is None:
                 added += 1
             else:
                 modified += 1
         except (OSError, ValueError):
-            # Omit unreadable files from this cache snapshot. They remain on disk
-            # and will be treated as new candidates on the next scheduled scan.
+            unreadable += 1
             continue
 
     deleted = len(set(previous) - set(current))
+    ratings = {str(star): sum(1 for p in current.values() if p.get("rating", 0) == star) for star in range(6)}
+    orientations = {kind: sum(1 for p in current.values() if p.get("orientation") == kind)
+                    for kind in ("landscape", "portrait", "square", "unknown")}
     summary = {
-        "found": len(current),
-        "added": added,
-        "modified": modified,
-        "deleted": deleted,
-        "unchanged": unchanged,
-        "completed_at": datetime.now(timezone.utc).isoformat(),
+        "status": "success", "found": len(current), "discovered": discovered,
+        "added": added, "modified": modified, "deleted": deleted,
+        "unchanged": unchanged, "unreadable": unreadable,
+        "ratings": ratings, "orientations": orientations,
+        "completed_at": datetime.now(timezone.utc).isoformat(), "error": None,
     }
     return current, summary
