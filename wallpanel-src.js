@@ -4138,12 +4138,12 @@ function initWallpanel() {
 			if (updateIndex) {
 				this.mediaIndex = mediaIndex;
 				if (config.photo_selector_enabled && config.media_order == "random") {
-					this.photoSelectorRecent = this.photoSelectorRecent || [];
-					this.photoSelectorRecent.push(this.mediaList[mediaIndex]);
-					const historySize = Math.max(0, Math.min(100, Number(config.photo_selector_history_size ?? 5) || 0));
-					this.photoSelectorRecent = historySize
-						? this.photoSelectorRecent.slice(-historySize)
-						: [];
+					const historySize = effectiveHistorySize(
+						this.photoSelectorCandidates || [],
+						config.photo_selector_history_size ?? 5
+					);
+					this.photoSelectorRecent = [...(this.photoSelectorRecent || []), this.mediaList[mediaIndex]]
+						.slice(-Math.max(1, historySize));
 				}
 			}
 			return this.mediaList[mediaIndex];
