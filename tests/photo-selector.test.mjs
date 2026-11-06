@@ -15,9 +15,11 @@ test("weighted choice runs independently on each selection", () => {
   assert.equal(selectPhoto(photos, [], 0, () => 0.5), "l");
   assert.equal(selectPhoto(photos, [], 0, () => 0), "p");
 });
-test("recent photos excluded until oldest history is relaxed", () => {
-  assert.equal(selectPhoto(photos, ["p","l"], 2, () => 0), "l2");
-  assert.equal(selectPhoto(photos.slice(0,2), ["p","l"], 2, () => 0), "p");
+test("recent photos are excluded within the effective history cap", () => {
+  const pool = Array.from({length: 8}, (_, i) => ({url: String(i), orientation: "landscape", weight: 1}));
+  assert.equal(selectPhoto(pool, ["0", "1"], 2, () => 0), "2");
+  // A two-image library has a zero-length exclusion window.
+  assert.equal(selectPhoto(pool.slice(0, 2), ["0", "1"], 2, () => 0), "0");
 });
 test("portrait must be followed by landscape where available", () => {
   assert.notEqual(selectPhoto(photos, ["p"], 1, () => 0), "p");
