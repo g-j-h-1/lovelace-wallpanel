@@ -3058,7 +3058,7 @@ function initWallpanel() {
 			// Split only the basename, preserving the original image.filename field.
 			const filenameSeparator = String(config.image_info_filename_separator ?? "_");
 			const filename = String(mediaInfo.image.filename || "");
-			const basename = filename.replace(/\\.[^.]*$/, "");
+			const basename = filename.replace(/\.[^.]*$/, "");
 			mediaInfo.image.filename_parts = filenameSeparator ? basename.split(filenameSeparator) : [basename];
 			mediaInfo.mediaPosition = this.mediaIndex + 1;
 			mediaInfo.mediaCount = this.mediaList.length;
