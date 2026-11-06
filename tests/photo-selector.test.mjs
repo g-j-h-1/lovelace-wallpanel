@@ -33,10 +33,13 @@ test("cycle wraparound is portrait-to-landscape safe", () => {
 
 test("repeat avoidance is secondary to the orientation rule", () => {
   const photos = [
+    { url: "previous-portrait", orientation: "portrait", weight: 1 },
     { url: "recent-landscape", orientation: "landscape", weight: 1 },
     { url: "fresh-portrait", orientation: "portrait", weight: 1 },
   ];
-  const result = orderPhotos(photos, ["recent-landscape"], 1, stableRandom);
+  // The last displayed image was a portrait. Even though the landscape is
+  // recent, orientation safety takes priority over the repeat-avoidance rule.
+  const result = orderPhotos(photos, ["recent-landscape", "previous-portrait"], 2, stableRandom);
   assert.equal(result[0], "recent-landscape");
 });
 
