@@ -1,4 +1,4 @@
-import { matchPhotoMetadata, selectPhoto, filterPhotos } from "./photo-selector.mjs";
+import { matchPhotoMetadata, selectPhoto, filterPhotos, effectiveHistorySize } from "./photo-selector.mjs";
 
 /**
  * (C) 2020-2026 by Jan Schneider (oss@janschneider.net)
@@ -4085,7 +4085,7 @@ function initWallpanel() {
 				return null;
 			}
 			if (config.photo_selector_enabled && config.media_order == "random" && this.photoSelectorCandidates) {
-				const historySize = Math.max(0, Math.min(100, Number(config.photo_selector_history_size ?? 5) || 0));
+				const historySize = effectiveHistorySize(this.photoSelectorCandidates, config.photo_selector_history_size ?? 5);
 				const recent = (this.photoSelectorRecent || []).slice(-Math.max(1, historySize));
 				const selected = selectPhoto(this.photoSelectorCandidates, recent, historySize);
 				if (updateIndex && selected) {
