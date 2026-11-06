@@ -48,7 +48,13 @@ export function filterPhotos(items, include = "", exclude = "") {
   const includeRegex = include ? new RegExp(include, "i") : null;
   const excludeRegex = exclude ? new RegExp(exclude, "i") : null;
   return items.filter(item => {
-    const filename = decodeURIComponent(item.url.split("/").at(-1).split("?")[0]);
+    const encodedFilename = item.url.split("?")[0].split("/").at(-1);
+    let filename = encodedFilename;
+    try {
+      filename = decodeURIComponent(encodedFilename);
+    } catch (_error) {
+      // An invalid URL escape must not abort the entire slideshow.
+    }
     return (!includeRegex || includeRegex.test(filename)) && (!excludeRegex || !excludeRegex.test(filename));
   });
 }
