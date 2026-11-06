@@ -16,7 +16,7 @@ SOF_MARKERS = {
 }
 
 
-def _jpeg_metadata(path: Path) -> tuple[int | None, int | None, int]:
+def _jpeg_metadata(path: Path, issues: list[str] | None = None) -> tuple[int | None, int | None, int]:
     """Return width, height and Lightroom XMP rating (0 means unrated)."""
     width = height = None
     rating = 0
@@ -48,6 +48,12 @@ def _jpeg_metadata(path: Path) -> tuple[int | None, int | None, int]:
                 if payload.startswith(XMP_HEADER):
                     packet = payload[len(XMP_HEADER):].rstrip(b"\x00")
                     rating = _extract_rating(packet) or 0
+                    try:
+                        ET.fromstring(packet)
+                    except ET.ParseError:
+                        rating = 0
+                        if issues is not None:
+                            issues.append("Malformed XMP metadata; assigned zero stars")
             elif marker in SOF_MARKERS:
                 payload = image.read(payload_length)
                 if len(payload) >= 5:
@@ -55,6 +61,8 @@ def _jpeg_metadata(path: Path) -> tuple[int | None, int | None, int]:
                     width = int.from_bytes(payload[3:5], "big")
             else:
                 image.seek(payload_length, 1)
+    if not width or not height:
+        raise ValueError("Missing or invalid JPEG dimensions")
     return width, height, rating
 
 
@@ -106,9 +114,14 @@ def scan_photo_directory(
             old = previous.get(relative)
             if old and old.get("mtime_ns") == stat.st_mtime_ns and old.get("size") == stat.st_size:
                 current[relative] = old
+                for reason in old.get("metadata_issues", []):
+                    exceptions.append({"path": relative, "reason": reason})
                 unchanged += 1
                 continue
-            width, height, rating = _jpeg_metadata(resolved_path)
+            metadata_issues = []
+            width, height, rating = _jpeg_metadata(resolved_path, metadata_issues)
+            for reason in metadata_issues:
+                exceptions.append({"path": relative, "reason": reason})
             if not width or not height:
                 exceptions.append({"path": relative, "reason": "Image dimensions unavailable; assigned zero stars"})
                 rating = 0
@@ -120,7 +133,8 @@ def scan_photo_directory(
                     else "portrait" if width and height and height > width
                     else "square" if width and height else "unknown"
                 ),
-                "width": width, "height": height, "weight": max(1, rating),
+                "width": width, "height": height, "weight": max(0, rating),
+                "metadata_issues": metadata_issues,
             }
             if old is None:
                 added += 1
