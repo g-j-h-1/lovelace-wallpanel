@@ -28,6 +28,7 @@ METRICS = (
     ("rating_4", "4-star photos", "mdi:star", None),
     ("rating_5", "5-star photos", "mdi:star", None),
     ("unreadable", "Unreadable JPEGs", "mdi:alert-circle", None),
+    ("exceptions", "Metadata exceptions", "mdi:file-alert", None),
 )
 
 
@@ -90,6 +91,8 @@ class PhotoSelectorSensor(SensorEntity):
             return summary.get("discovered", 0)
         if self.key in ("landscape", "portrait", "square", "unknown"):
             return orientations.get(self.key, 0)
+        if self.key == "exceptions":
+            return summary.get("exception_count", 0)
         if self.key == "unreadable":
             return summary.get("unreadable", 0)
         if self.key == "unrated":
@@ -112,6 +115,8 @@ class PhotoSelectorSensor(SensorEntity):
             "unchanged": summary.get("unchanged", 0),
             "ratings": ratings,
             "orientations": orientations,
+            "exception_count": summary.get("exception_count", 0),
+            "exception_examples": (summary.get("exceptions") or [])[:20],
         }
 
     def _refresh(self):
