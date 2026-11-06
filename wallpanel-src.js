@@ -2327,6 +2327,9 @@ function initWallpanel() {
 					if (showOnOrientation !== undefined) {
 						const allowed = Array.isArray(showOnOrientation) ? showOnOrientation : [showOnOrientation];
 						this.orientationCardRules.push({ element: cardContainer, allowed: allowed.map(value => String(value).toLowerCase()) });
+						if (this.currentPhotoOrientation) {
+							cardContainer.style.display = this.orientationCardRules.at(-1).allowed.includes(this.currentPhotoOrientation) ? "" : "none";
+						}
 					}
 				});
 			}
@@ -2338,6 +2341,7 @@ function initWallpanel() {
 			const width = mediaElement.naturalWidth || mediaElement.videoWidth || 0;
 			const height = mediaElement.naturalHeight || mediaElement.videoHeight || 0;
 			const orientation = width && height ? (width > height ? "landscape" : height > width ? "portrait" : "square") : "unknown";
+			this.currentPhotoOrientation = orientation;
 			for (const rule of this.orientationCardRules || []) {
 				rule.element.style.display = rule.allowed.includes(orientation) ? "" : "none";
 			}
