@@ -29,8 +29,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Check JavaScript syntax
+        run: |
+          node --check wallpanel-src.js
+          node --check photo-selector.mjs
       - name: JavaScript unit tests
-        run: node --test tests/photo-selector.test.mjs
+        run: node --test tests/*.test.mjs tests/*.test.cjs
       - name: Python scanner tests
         run: python -m unittest discover -s tests -p 'test_wallpanel_photo_selector_scanner.py'
       - name: Install build dependencies
