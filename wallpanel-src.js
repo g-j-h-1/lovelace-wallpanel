@@ -1,3 +1,5 @@
+import { orderPhotos } from "./photo-selector.js";
+
 /**
  * (C) 2020-2026 by Jan Schneider (oss@janschneider.net)
  * Released under the GNU General Public License v3.0
@@ -3366,44 +3368,7 @@ function initWallpanel() {
 				const historySize = Math.max(0, Math.min(100, Number(config.photo_selector_history_size ?? 5) || 0));
 				const recent = historySize ? (this.photoSelectorRecent || []).slice(-historySize) : [];
 
-				const orientationByUrl = new Map(candidates.map((item) => [item.url, item.orientation]));
-				const ordered = [];
-				let previousOrientation = null;
-				while (candidates.length) {
-					// Apply repeat avoidance only to the first N positions in the new
-					// order. Older photos remain in the cycle; they are not discarded.
-					// Orientation is a hard rule; repeat avoidance is secondary.
-					let eligible = candidates;
-					if (previousOrientation === "portrait") {
-						const landscapes = candidates.filter((item) => item.orientation === "landscape");
-						if (landscapes.length) eligible = landscapes;
-					}
-					if (ordered.length < historySize) {
-						const fresh = eligible.filter((item) => !recent.includes(item.url));
-						if (fresh.length) eligible = fresh;
-					}
-					// Exponential-race weighted sampling: every photo appears once per
-					// cycle, while higher Lightroom ratings are more likely to appear early.
-					let selected = eligible[0];
-					let bestKey = Infinity;
-					for (const item of eligible) {
-						const key = -Math.log(Math.max(Number.EPSILON, Math.random())) / item.weight;
-						if (key < bestKey) { bestKey = key; selected = item; }
-					}
-					ordered.push(selected.url);
-					previousOrientation = selected.orientation;
-					candidates.splice(candidates.indexOf(selected), 1);
-				}
-				// Make the order safe when playback wraps from its final item to
-				// its first. Rotating to a landscape preserves every adjacent pair.
-				if (ordered.length > 1 && orientationByUrl.get(ordered[ordered.length - 1]) === "portrait") {
-					const firstLandscape = ordered.findIndex(
-						(url) => orientationByUrl.get(url) === "landscape"
-					);
-					if (firstLandscape > 0) ordered.push(...ordered.splice(0, firstLandscape));
-				}
-				const selectedUrls = new Set(ordered);
-				return ordered.concat(urls.filter((url) => !selectedUrls.has(url)));
+				return orderPhotos(candidates, recent, historySize);
 			} catch (error) {
 				logger.warn("Photo Selector metadata unavailable; using normal WallPanel ordering", error);
 				return urls;
