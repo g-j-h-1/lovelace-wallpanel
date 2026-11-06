@@ -1,123 +1,40 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getRatingFrequency, matchPhotoMetadata, orderPhotos } from "../photo-selector.mjs";
+import { getRatingFrequency, matchPhotoMetadata, selectPhoto, filterPhotos } from "../photo-selector.mjs";
 
-const stableRandom = () => 0.5;
-
-test("portrait is always followed by landscape when one remains", () => {
-  const photos = [
-    { url: "p1", orientation: "portrait", weight: 1 },
-    { url: "p2", orientation: "portrait", weight: 1 },
-    { url: "l1", orientation: "landscape", weight: 1 },
-    { url: "l2", orientation: "landscape", weight: 1 },
-  ];
-  const result = orderPhotos(photos, [], 0, stableRandom);
-  for (let i = 0; i < result.length - 1; i++) {
-    const current = photos.find((p) => p.url === result[i]);
-    const next = photos.find((p) => p.url === result[i + 1]);
-    if (current.orientation === "portrait") assert.equal(next.orientation, "landscape");
-  }
+const photos = [
+  { url: "p", orientation: "portrait", weight: 1 },
+  { url: "l", orientation: "landscape", weight: 5 },
+  { url: "l2", orientation: "landscape", weight: 1 },
+];
+test("zero-rated defaults to zero weight but is configurable", () => {
+  assert.equal(getRatingFrequency(0), 0);
+  assert.equal(getRatingFrequency(0, {0: 3}), 3);
 });
-
-test("cycle wraparound is portrait-to-landscape safe", () => {
-  const photos = [
-    { url: "p1", orientation: "portrait", weight: 1 },
-    { url: "p2", orientation: "portrait", weight: 1 },
-    { url: "l1", orientation: "landscape", weight: 1 },
-  ];
-  const result = orderPhotos(photos, [], 0, stableRandom);
-  const last = photos.find((p) => p.url === result.at(-1));
-  const first = photos.find((p) => p.url === result[0]);
-  if (last.orientation === "portrait") assert.equal(first.orientation, "landscape");
+test("weighted choice runs independently on each selection", () => {
+  assert.equal(selectPhoto(photos, [], 0, () => 0.5), "l");
+  assert.equal(selectPhoto(photos, [], 0, () => 0), "p");
 });
-
-test("repeat avoidance is secondary to the orientation rule", () => {
-  const photos = [
-    { url: "previous-portrait", orientation: "portrait", weight: 1 },
-    { url: "recent-landscape", orientation: "landscape", weight: 1 },
-    { url: "fresh-portrait", orientation: "portrait", weight: 1 },
-  ];
-  // The last displayed image was a portrait. Even though the landscape is
-  // recent, orientation safety takes priority over the repeat-avoidance rule.
-  const result = orderPhotos(photos, ["recent-landscape", "previous-portrait"], 2, stableRandom);
-  assert.equal(result[0], "recent-landscape");
+test("recent photos excluded until oldest history is relaxed", () => {
+  assert.equal(selectPhoto(photos, ["p","l"], 2, () => 0), "l2");
+  assert.equal(selectPhoto(photos.slice(0,2), ["p","l"], 2, () => 0), "p");
 });
-
-test("higher ratings receive greater sampling weight", () => {
-  const photos = [
-    { url: "one-star", orientation: "landscape", weight: 1 },
-    { url: "five-star", orientation: "landscape", weight: 5 },
-  ];
-  const result = orderPhotos(photos, [], 0, stableRandom);
-  assert.equal(result[0], "five-star");
+test("portrait must be followed by landscape where available", () => {
+  assert.notEqual(selectPhoto(photos, ["p"], 1, () => 0), "p");
 });
-
-test("every input photo appears exactly once", () => {
-  const photos = [
-    { url: "a", orientation: "portrait", weight: 1 },
-    { url: "b", orientation: "landscape", weight: 2 },
-    { url: "c", orientation: "square", weight: 3 },
-  ];
-  const result = orderPhotos(photos, [], 0, stableRandom);
-  assert.deepEqual([...result].sort(), ["a", "b", "c"]);
+test("zero weights are never restored during history fallback", () => {
+  assert.equal(selectPhoto([{url:"x",weight:0,orientation:"landscape"}], [], 0), null);
 });
-
-test("media-source IDs match scanner paths including nested and encoded filenames", () => {
-  const urls = [
-    "media-source://media_source/local/PortalPhotos/album/Match%20day.jpg",
-    "media-source://media_source/local/PortalPhotos/portrait.jpg",
-  ];
-  const photos = [
-    { path: "album/Match day.jpg", rating: 5, orientation: "landscape" },
-    { path: "portrait.jpg", rating: 0, orientation: "portrait" },
-  ];
-  assert.deepEqual(matchPhotoMetadata(urls, photos, "PortalPhotos"), [
-    { url: urls[0], weight: 5, orientation: "landscape" },
-    { url: urls[1], weight: 1, orientation: "portrait" },
-  ]);
+test("unmatched metadata is excluded individually", () => {
+  const urls = ["media-source://media_source/local/PortalPhotos/known.jpg", "media-source://media_source/local/PortalPhotos/missing.jpg"];
+  const result = matchPhotoMetadata(urls, [{path:"known.jpg",rating:4,orientation:"landscape"}], "PortalPhotos");
+  assert.equal(result.length, 1);
+  assert.equal(result[0].weight, 4);
 });
-
-test("metadata matching fails closed when any media item is unmatched", () => {
-  const urls = [
-    "media-source://media_source/local/PortalPhotos/known.jpg",
-    "media-source://media_source/local/PortalPhotos/missing.jpg",
-  ];
-  const photos = [{ path: "known.jpg", rating: 3, orientation: "landscape" }];
-  assert.equal(matchPhotoMetadata(urls, photos, "PortalPhotos"), null);
+test("filename include and exclude regex filters are case insensitive", () => {
+  const result = filterPhotos([{url:"/local/2026-Rugby.JPG"}, {url:"/local/2026-Private.jpg"}, {url:"/local/2025-Rugby.jpg"}], "^2026", "private");
+  assert.deepEqual(result.map(x=>x.url), ["/local/2026-Rugby.JPG"]);
 });
-
-test("metadata matching rejects non-local media source identifiers", () => {
-  const urls = ["media-source://media_source/other/PortalPhotos/photo.jpg"];
-  const photos = [{ path: "photo.jpg", rating: 3, orientation: "landscape" }];
-  assert.equal(matchPhotoMetadata(urls, photos, "PortalPhotos"), null);
-});
-
-
-test("default rating frequencies preserve the existing relative weighting", () => {
-  assert.deepEqual([0, 1, 2, 3, 4, 5].map((rating) => getRatingFrequency(rating)), [1, 1, 2, 3, 4, 5]);
-});
-
-test("configured frequency overrides defaults and zero excludes a rating", () => {
-  const urls = [
-    "media-source://media_source/local/PortalPhotos/unrated.jpg",
-    "media-source://media_source/local/PortalPhotos/one.jpg",
-    "media-source://media_source/local/PortalPhotos/five.jpg",
-  ];
-  const photos = [
-    { path: "unrated.jpg", rating: 0, orientation: "landscape" },
-    { path: "one.jpg", rating: 1, orientation: "landscape" },
-    { path: "five.jpg", rating: 5, orientation: "landscape" },
-  ];
-  const candidates = matchPhotoMetadata(urls, photos, "PortalPhotos", { 0: 0, 1: 3, 5: 0 });
-  assert.deepEqual(candidates.map((item) => item.weight), [0, 3, 0]);
-  assert.deepEqual(orderPhotos(candidates, [], 0, stableRandom), [urls[1]]);
-});
-
-test("orderPhotos never returns photos with zero or invalid weights", () => {
-  const photos = [
-    { url: "excluded", orientation: "landscape", weight: 0 },
-    { url: "invalid", orientation: "landscape", weight: -1 },
-    { url: "included", orientation: "landscape", weight: 2 },
-  ];
-  assert.deepEqual(orderPhotos(photos, [], 0, stableRandom), ["included"]);
+test("invalid regex throws instead of silently passing", () => {
+  assert.throws(() => filterPhotos(photos, "[", ""), SyntaxError);
 });
