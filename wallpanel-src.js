@@ -1,4 +1,4 @@
-import { orderPhotos } from "./photo-selector.mjs";
+import { matchPhotoMetadata, orderPhotos } from "./photo-selector.mjs";
 
 /**
  * (C) 2020-2026 by Jan Schneider (oss@janschneider.net)
@@ -3339,29 +3339,11 @@ function initWallpanel() {
 			}
 			try {
 				const result = await this.hass.callWS({ type: "wallpanel_photo_selector/photos" });
-				const metadata = new Map((result.photos || []).map((photo) => [photo.path, photo]));
-				const folderPrefix = result.media_folder ? `${result.media_folder}/` : "";
-				const candidates = urls.map((url) => {
-					const marker = "/local/";
-					const position = url.indexOf(marker);
-					if (position < 0) return null;
-					let relativePath;
-					try {
-						relativePath = decodeURIComponent(url.slice(position + marker.length));
-					} catch (_error) {
-						relativePath = url.slice(position + marker.length);
-					}
-					if (folderPrefix && relativePath.startsWith(folderPrefix)) {
-						relativePath = relativePath.slice(folderPrefix.length);
-					}
-					const photo = metadata.get(relativePath);
-					return photo
-						? { url, weight: Math.max(1, Number(photo.rating) || 0), orientation: photo.orientation }
-						: null;
-				}).filter(Boolean);
+				const candidates = matchPhotoMetadata(urls, result.photos, result.media_folder);
+
 				// Do not partially reorder a list: unmatched entries have unknown
 				// orientation and would invalidate the portrait-to-landscape rule.
-				if (candidates.length !== urls.length || candidates.length < 2) return urls;
+				if (!candidates || candidates.length < 2) return urls;
 
 				// Avoid immediately replaying the last few selections after a media
 				// list refresh, while retaining a fallback for small libraries.
