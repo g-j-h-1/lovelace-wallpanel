@@ -1,4 +1,4 @@
-import { matchPhotoMetadata, orderPhotos } from "./photo-selector.mjs";
+import { matchPhotoMetadata, selectPhoto, filterPhotos } from "./photo-selector.mjs";
 
 /**
  * (C) 2020-2026 by Jan Schneider (oss@janschneider.net)
@@ -77,8 +77,11 @@ const defaultConfig = {
 	media_list_max_size: 500,
 	media_order: "random", // sorted / random / random_but_synced / random_path
 	photo_selector_enabled: false, // Use WallPanel Photo Selector metadata for local media sources
-	photo_selector_history_size: 5, // Number of recently displayed photos to avoid after a list refresh (0 disables)
-	photo_selector_rating_frequencies: { 0: 1, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 }, // Relative selection weights by Lightroom rating; 0 excludes that rating
+	photo_selector_history_size: 5, // Number of recently displayed photos to avoid (0 disables)
+	photo_selector_filename_include: "",
+	photo_selector_filename_exclude: "",
+	photo_selector_show_filename: false,
+	photo_selector_rating_frequencies: { 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 }, // Relative selection weights by Lightroom rating; 0 excludes that rating
 	exclude_filenames: [], // Excluded filenames (regex)
 	exclude_media_types: [], // Exclude media types (image / video)
 	exclude_media_orientation: "", // Exclude media items with this orientation (landscape / portrait / auto)
@@ -3335,35 +3338,18 @@ function initWallpanel() {
 		}
 
 		async applyPhotoSelectorOrder(urls) {
-			if (!config.photo_selector_enabled || !mediaSourceType().startsWith("media-source")) {
-				return urls;
-			}
+			this.photoSelectorCandidates = null;
+			if (!config.photo_selector_enabled || !mediaSourceType().startsWith("media-source")) return urls;
 			try {
 				const result = await this.hass.callWS({ type: "wallpanel_photo_selector/photos" });
-				const candidates = matchPhotoMetadata(
-					urls,
-					result.photos,
-					result.media_folder,
-					config.photo_selector_rating_frequencies
-				);
-
-				// Do not partially reorder a list: unmatched entries have unknown
-				// orientation and would invalidate the portrait-to-landscape rule.
-				if (!candidates) return urls;
-				if (!candidates.length) {
-					logger.warn("Photo Selector: all photos are excluded by photo_selector_rating_frequencies");
-					return [];
-				}
-
-				// Avoid immediately replaying the last few selections after a media
-				// list refresh, while retaining a fallback for small libraries.
-				const historySize = Math.max(0, Math.min(100, Number(config.photo_selector_history_size ?? 5) || 0));
-				const recent = historySize ? (this.photoSelectorRecent || []).slice(-historySize) : [];
-
-				return orderPhotos(candidates, recent, historySize);
+				const matched = matchPhotoMetadata(urls, result.photos, result.media_folder, config.photo_selector_rating_frequencies);
+				const candidates = filterPhotos(matched, config.photo_selector_filename_include, config.photo_selector_filename_exclude);
+				this.photoSelectorCandidates = candidates;
+				logger.debug("Photo Selector: indexed", { total: urls.length, matched: matched.length, filtered: candidates.length, eligible: candidates.filter(item => item.weight > 0).length });
+				return candidates.map(item => item.url);
 			} catch (error) {
-				logger.warn("Photo Selector metadata unavailable; using normal WallPanel ordering", error);
-				return urls;
+				logger.warn("Photo Selector unavailable or invalid filename filter", error);
+				return [];
 			}
 		}
 
@@ -4089,6 +4075,16 @@ function initWallpanel() {
 		getNextMediaURL(updateIndex = true) {
 			if (!this.mediaList.length) {
 				return null;
+			}
+			if (config.photo_selector_enabled && config.media_order == "random" && this.photoSelectorCandidates) {
+				const historySize = Math.max(0, Math.min(100, Number(config.photo_selector_history_size ?? 5) || 0));
+				const recent = (this.photoSelectorRecent || []).slice(-historySize);
+				const selected = selectPhoto(this.photoSelectorCandidates, recent, historySize);
+				if (updateIndex && selected) {
+					this.photoSelectorRecent = historySize ? [...recent, selected].slice(-historySize) : [];
+					this.mediaIndex = this.mediaList.indexOf(selected);
+				}
+				return selected;
 			}
 			let mediaIndex;
 			if (config.media_order == "random_but_synced") {
