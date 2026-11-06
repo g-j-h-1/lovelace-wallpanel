@@ -95,6 +95,7 @@ const defaultConfig = {
 	show_image_info: false,
 	fetch_address_data: false,
 	image_info_template: "${DateTimeOriginal}",
+	image_info_filename_separator: "_", // Literal separator for image.filename_parts (0-based indices)
 	info_animation_duration_x: 0,
 	info_animation_duration_y: 0,
 	info_animation_timing_function_x: "ease",
@@ -3053,6 +3054,12 @@ function initWallpanel() {
 					mediaInfo.image.folderName = parts[parts.length - 2];
 				}
 			}
+			// Expose filename segments to image_info_template as image.filename_parts.0, .1, etc.
+			// Split only the basename, preserving the original image.filename field.
+			const filenameSeparator = String(config.image_info_filename_separator ?? "_");
+			const filename = String(mediaInfo.image.filename || "");
+			const basename = filename.replace(/\\.[^.]*$/, "");
+			mediaInfo.image.filename_parts = filenameSeparator ? basename.split(filenameSeparator) : [basename];
 			mediaInfo.mediaPosition = this.mediaIndex + 1;
 			mediaInfo.mediaCount = this.mediaList.length;
 
