@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +11,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN, DEFAULT_MEDIA_PATH, DEFAULT_SCAN_INTERVAL, PLATFORMS
@@ -61,7 +60,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "photos": cached.get("photos", {}), "last_scan": cached.get("last_scan"),
         "last_summary": cached.get("last_summary"), "scan_status": "starting",
         "scan_error": None, "store": store, "lock": asyncio.Lock(),
-        "unload_callback": None,
+        "scan_task": None, "scan": None,
     }
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = data
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -95,11 +94,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     "found": len(data["photos"]),
                 }
                 _LOGGER.exception("Unable to scan photo directory %s", media_path)
-            from homeassistant.helpers.dispatcher import async_dispatcher_send
             async_dispatcher_send(hass, f"{DOMAIN}_updated_{entry.entry_id}")
 
-    await _scan()
-    data["unload_callback"] = async_track_time_interval(hass, _scan, timedelta(minutes=interval))
+    async def _scan_loop() -> None:
+        # Run an initial scan, then schedule the next one after each completed scan.
+        # Keeping this task in the config entry avoids a lost interval callback.
+        while True:
+            await _scan()
+            await asyncio.sleep(interval * 60)
+
+    data["scan"] = _scan
+    data["scan_task"] = entry.async_create_background_task(
+        hass, _scan_loop(), "WallPanel Photo Selector scheduled scan"
+    )
     return True
 
 
@@ -107,8 +114,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload integration and diagnostic entities."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     data = hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
-    if data and data.get("unload_callback"):
-        data["unload_callback"]()
+    if data and data.get("scan_task"):
+        data["scan_task"].cancel()
     if not hass.data.get(DOMAIN):
         hass.data.pop(DOMAIN, None)
     return unload_ok
