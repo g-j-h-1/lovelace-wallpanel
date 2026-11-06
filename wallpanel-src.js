@@ -2169,6 +2169,7 @@ function initWallpanel() {
 			this.__badges = [];
 			this.__cards = [];
 			this.__views = [];
+			this.orientationCardRules = [];
 			this.energyCollectionUpdateEnabled = false;
 
 			this.shadowRoot.querySelectorAll(".wp-card").forEach((card) => {
@@ -2279,6 +2280,8 @@ function initWallpanel() {
 				config.cards.forEach((card) => {
 					// Copy object
 					const cardConfig = JSON.parse(JSON.stringify(card));
+					const showOnOrientation = cardConfig.show_on_orientation;
+					delete cardConfig.show_on_orientation;
 					logger.debug("Creating card:", cardConfig);
 					let style = {};
 					if (cardConfig.wp_style) {
@@ -2321,10 +2324,23 @@ function initWallpanel() {
 
 					cardContainer.append(cardElement);
 					parent.appendChild(cardContainer);
+					if (showOnOrientation !== undefined) {
+						const allowed = Array.isArray(showOnOrientation) ? showOnOrientation : [showOnOrientation];
+						this.orientationCardRules.push({ element: cardContainer, allowed: allowed.map(value => String(value).toLowerCase()) });
+					}
 				});
 			}
 
 			setTimeout(this.updateShadowStyle.bind(this), 500);
+		}
+
+		updateOrientationCardVisibility(mediaElement) {
+			const width = mediaElement.naturalWidth || mediaElement.videoWidth || 0;
+			const height = mediaElement.naturalHeight || mediaElement.videoHeight || 0;
+			const orientation = width && height ? (width > height ? "landscape" : height > width ? "portrait" : "square") : "unknown";
+			for (const rule of this.orientationCardRules || []) {
+				rule.element.style.display = rule.allowed.includes(orientation) ? "" : "none";
+			}
 		}
 
 		setDisplayTime() {
@@ -4646,6 +4662,7 @@ function initWallpanel() {
 
 			this.setMediaDataInfo();
 			this.setMediaDimensions();
+			this.updateOrientationCardVisibility(newMedia);
 			this.setImageURLEntityState();
 			this.startPlayingActiveMedia();
 			this.restartProgressBarAnimation();
