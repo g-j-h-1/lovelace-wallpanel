@@ -12,6 +12,13 @@ export function getRatingFrequency(rating, frequencies = {}) {
   return Number.isFinite(configured) ? Math.max(0, configured) : DEFAULT_RATING_FREQUENCIES[key];
 }
 
+/** Cap recent-history exclusions to 25% of selectable photographs. */
+export function effectiveHistorySize(items, configuredSize = 5) {
+  const eligibleCount = items.filter(item => Number.isFinite(Number(item.weight)) && Number(item.weight) > 0).length;
+  const requested = Math.max(0, Math.floor(Number(configuredSize) || 0));
+  return Math.min(requested, Math.floor(eligibleCount / 4));
+}
+
 /** Select a single image from the full pool on every transition. */
 export function selectPhoto(items, recent = [], historySize = 5, random = Math.random) {
   const pool = items.filter(item => Number.isFinite(Number(item.weight)) && Number(item.weight) > 0);
@@ -20,7 +27,8 @@ export function selectPhoto(items, recent = [], historySize = 5, random = Math.r
   const previous = pool.find(item => item.url === last);
   const requireLandscape = previous?.orientation === "portrait" && pool.some(item => item.orientation === "landscape");
   const oriented = requireLandscape ? pool.filter(item => item.orientation === "landscape") : pool;
-  const history = historySize > 0 ? recent.slice(-historySize) : [];
+  const cappedHistorySize = effectiveHistorySize(pool, historySize);
+  const history = cappedHistorySize > 0 ? recent.slice(-cappedHistorySize) : [];
   let eligible = oriented.filter(item => !history.includes(item.url));
   // For small collections relax the oldest exclusions, never rating-zero exclusions.
   for (let n = 1; !eligible.length && n <= history.length; n++) {
