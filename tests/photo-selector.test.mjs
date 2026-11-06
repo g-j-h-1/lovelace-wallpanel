@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { orderPhotos } from "../photo-selector.mjs";
+import { matchPhotoMetadata, orderPhotos } from "../photo-selector.mjs";
 
 const stableRandom = () => 0.5;
 
@@ -60,4 +60,34 @@ test("every input photo appears exactly once", () => {
   ];
   const result = orderPhotos(photos, [], 0, stableRandom);
   assert.deepEqual([...result].sort(), ["a", "b", "c"]);
+});
+
+test("media-source IDs match scanner paths including nested and encoded filenames", () => {
+  const urls = [
+    "media-source://media_source/local/PortalPhotos/album/Match%20day.jpg",
+    "media-source://media_source/local/PortalPhotos/portrait.jpg",
+  ];
+  const photos = [
+    { path: "album/Match day.jpg", rating: 5, orientation: "landscape" },
+    { path: "portrait.jpg", rating: 0, orientation: "portrait" },
+  ];
+  assert.deepEqual(matchPhotoMetadata(urls, photos, "PortalPhotos"), [
+    { url: urls[0], weight: 5, orientation: "landscape" },
+    { url: urls[1], weight: 1, orientation: "portrait" },
+  ]);
+});
+
+test("metadata matching fails closed when any media item is unmatched", () => {
+  const urls = [
+    "media-source://media_source/local/PortalPhotos/known.jpg",
+    "media-source://media_source/local/PortalPhotos/missing.jpg",
+  ];
+  const photos = [{ path: "known.jpg", rating: 3, orientation: "landscape" }];
+  assert.equal(matchPhotoMetadata(urls, photos, "PortalPhotos"), null);
+});
+
+test("metadata matching rejects non-local media source identifiers", () => {
+  const urls = ["media-source://media_source/other/PortalPhotos/photo.jpg"];
+  const photos = [{ path: "photo.jpg", rating: 3, orientation: "landscape" }];
+  assert.equal(matchPhotoMetadata(urls, photos, "PortalPhotos"), null);
 });
