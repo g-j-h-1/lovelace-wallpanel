@@ -44,3 +44,31 @@ export function orderPhotos(items, recent = [], historySize = 5, random = Math.r
   }
   return ordered;
 }
+/**
+ * Match Home Assistant media-source IDs to scanner-relative photo metadata.
+ * WallPanel's media browser supplies IDs such as
+ * media-source://media_source/local/PortalPhotos/album/photo.jpg.
+ */
+export function matchPhotoMetadata(urls, photos, mediaFolder = "PortalPhotos") {
+  const metadata = new Map((photos || []).map((photo) => [photo.path, photo]));
+  const folderPrefix = mediaFolder ? `${mediaFolder}/` : "";
+  const candidates = urls.map((url) => {
+    const marker = "/local/";
+    const position = url.indexOf(marker);
+    if (position < 0) return null;
+    let relativePath;
+    try {
+      relativePath = decodeURIComponent(url.slice(position + marker.length));
+    } catch (_error) {
+      relativePath = url.slice(position + marker.length);
+    }
+    if (folderPrefix && relativePath.startsWith(folderPrefix)) {
+      relativePath = relativePath.slice(folderPrefix.length);
+    }
+    const photo = metadata.get(relativePath);
+    return photo
+      ? { url, weight: Math.max(1, Number(photo.rating) || 0), orientation: photo.orientation }
+      : null;
+  });
+  return candidates.every(Boolean) ? candidates : null;
+}
