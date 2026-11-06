@@ -90,6 +90,7 @@ def scan_photo_directory(
 
     current: dict[str, dict[str, Any]] = {}
     added = modified = unchanged = unreadable = discovered = 0
+    exceptions: list[dict[str, str]] = []
     for path in sorted(root.rglob("*")):
         if path.suffix.lower() not in IMAGE_SUFFIXES:
             continue
@@ -98,6 +99,7 @@ def scan_photo_directory(
             resolved_path = path.resolve(strict=True)
             if not resolved_path.is_relative_to(root) or not resolved_path.is_file():
                 unreadable += 1
+                exceptions.append({"path": path.relative_to(root).as_posix(), "reason": "File inaccessible or outside photo directory"})
                 continue
             relative = path.relative_to(root).as_posix()
             stat = resolved_path.stat()
@@ -107,6 +109,9 @@ def scan_photo_directory(
                 unchanged += 1
                 continue
             width, height, rating = _jpeg_metadata(resolved_path)
+            if not width or not height:
+                exceptions.append({"path": relative, "reason": "Image dimensions unavailable; assigned zero stars"})
+                rating = 0
             current[relative] = {
                 "path": relative, "size": stat.st_size, "mtime_ns": stat.st_mtime_ns,
                 "rating": rating,
@@ -121,7 +126,8 @@ def scan_photo_directory(
                 added += 1
             else:
                 modified += 1
-        except (OSError, ValueError):
+        except (OSError, ValueError) as error:
+            exceptions.append({"path": path.relative_to(root).as_posix(), "reason": f"Unreadable image: {error}"})
             unreadable += 1
             continue
 
@@ -134,6 +140,7 @@ def scan_photo_directory(
         "added": added, "modified": modified, "deleted": deleted,
         "unchanged": unchanged, "unreadable": unreadable,
         "ratings": ratings, "orientations": orientations,
+        "exceptions": exceptions, "exception_count": len(exceptions),
         "completed_at": datetime.now(timezone.utc).isoformat(), "error": None,
     }
     return current, summary
