@@ -121,3 +121,16 @@ This project is inspired by:
 ## Videos
 - [YouTube: Next Level Tablet Dashboard 🌅 mit lovelace-wallpanel 🤩 (🇩🇪)](https://www.youtube.com/watch?v=_KTyYIznzMY)
 - [YouTube: So wird dein Home Assistant Wallpanel zum Kunstobjekt! (🇩🇪)](https://youtu.be/ohBRmoOTKW0?si=S1Yl_Mmj7jXKLPpC)
+
+### Filename segments in image information
+
+To show a particular part of a filename, configure a literal separator and use a zero-based segment in the existing image information template:
+
+```yaml
+wallpanel:
+  show_image_info: true
+  image_info_filename_separator: "_"
+  image_info_template: '${image.filename_parts.1}'
+```
+
+For `20261025_Rugby vs Leicester_IMG1234.jpg`, segment `0` is `20261025`, segment `1` is `Rugby vs Leicester`, and segment `2` is `IMG1234`. The filename extension is excluded before splitting. Change `image_info_filename_separator` to any literal separator, including multi-character separators such as `--`. The original `${image.filename}` remains available.
