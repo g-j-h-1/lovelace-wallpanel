@@ -52,3 +52,8 @@ test("selection ignores stale history beyond the 25 percent cap", () => {
   const pool = Array.from({length: 8}, (_, i) => ({url: String(i), weight: 1, orientation: "landscape"}));
   assert.equal(selectPhoto(pool, ["0","1","2","3","4","5","6","7"], 50, () => 0), "0");
 });
+
+test("malformed URL escape does not abort filename filtering", () => {
+  const result = filterPhotos([{url:"/local/photo%ZZ.jpg"}], "photo", "");
+  assert.equal(result.length, 1);
+});
