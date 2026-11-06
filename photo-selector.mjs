@@ -2,7 +2,7 @@
  * Photo ordering for the WallPanel Photo Selector.
  * Kept independent of the card so the selection rules can be unit-tested.
  */
-export const DEFAULT_RATING_FREQUENCIES = Object.freeze({ 0: 1, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 });
+export const DEFAULT_RATING_FREQUENCIES = Object.freeze({ 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 });
 
 export function getRatingFrequency(rating, frequencies = {}) {
   const key = String(Math.max(0, Math.min(5, Number(rating) || 0)));
@@ -12,46 +12,37 @@ export function getRatingFrequency(rating, frequencies = {}) {
   return Number.isFinite(configured) ? Math.max(0, configured) : DEFAULT_RATING_FREQUENCIES[key];
 }
 
-export function orderPhotos(items, recent = [], historySize = 5, random = Math.random) {
-  const candidates = items
-    .map((item) => ({ ...item, weight: Number(item.weight) }))
-    .filter((item) => Number.isFinite(item.weight) && item.weight > 0);
-  const orientationByUrl = new Map(candidates.map((item) => [item.url, item.orientation]));
-  const ordered = [];
-  // Continue the orientation rule from the last image shown before a list refresh.
-  let previousOrientation = recent.length ? (orientationByUrl.get(recent[recent.length - 1]) || null) : null;
-
-  while (candidates.length) {
-    let eligible = candidates;
-    if (previousOrientation === "portrait") {
-      const landscapes = candidates.filter((item) => item.orientation === "landscape");
-      if (landscapes.length) eligible = landscapes;
-    }
-    if (ordered.length < historySize) {
-      const fresh = eligible.filter((item) => !recent.includes(item.url));
-      if (fresh.length) eligible = fresh;
-    }
-
-    let selected = eligible[0];
-    let bestKey = Infinity;
-    for (const item of eligible) {
-      const key = -Math.log(Math.max(Number.EPSILON, random())) / item.weight;
-      if (key < bestKey) {
-        bestKey = key;
-        selected = item;
-      }
-    }
-    ordered.push(selected.url);
-    previousOrientation = selected.orientation;
-    candidates.splice(candidates.indexOf(selected), 1);
+/** Select a single image from the full pool on every transition. */
+export function selectPhoto(items, recent = [], historySize = 5, random = Math.random) {
+  const pool = items.filter(item => Number.isFinite(Number(item.weight)) && Number(item.weight) > 0);
+  if (!pool.length) return null;
+  const last = recent.at(-1);
+  const previous = pool.find(item => item.url === last);
+  const requireLandscape = previous?.orientation === "portrait" && pool.some(item => item.orientation === "landscape");
+  const oriented = requireLandscape ? pool.filter(item => item.orientation === "landscape") : pool;
+  const history = recent.slice(-Math.max(0, historySize));
+  let eligible = oriented.filter(item => !history.includes(item.url));
+  // For small collections relax the oldest exclusions, never rating-zero exclusions.
+  for (let n = 1; !eligible.length && n <= history.length; n++) {
+    eligible = oriented.filter(item => !history.slice(n).includes(item.url));
   }
-
-  // Rotate the cycle so wraparound also obeys portrait -> landscape.
-  if (ordered.length > 1 && orientationByUrl.get(ordered[ordered.length - 1]) === "portrait") {
-    const firstLandscape = ordered.findIndex((url) => orientationByUrl.get(url) === "landscape");
-    if (firstLandscape > 0) ordered.push(...ordered.splice(0, firstLandscape));
+  if (!eligible.length) eligible = oriented;
+  const total = eligible.reduce((sum, item) => sum + Number(item.weight), 0);
+  let ticket = Math.max(0, Math.min(1 - Number.EPSILON, random())) * total;
+  for (const item of eligible) {
+    ticket -= Number(item.weight);
+    if (ticket < 0) return item.url;
   }
-  return ordered;
+  return eligible.at(-1).url;
+}
+
+export function filterPhotos(items, include = "", exclude = "") {
+  const includeRegex = include ? new RegExp(include, "i") : null;
+  const excludeRegex = exclude ? new RegExp(exclude, "i") : null;
+  return items.filter(item => {
+    const filename = decodeURIComponent(item.url.split("/").at(-1).split("?")[0]);
+    return (!includeRegex || includeRegex.test(filename)) && (!excludeRegex || !excludeRegex.test(filename));
+  });
 }
 /**
  * Match Home Assistant media-source IDs to scanner-relative photo metadata.
@@ -79,5 +70,5 @@ export function matchPhotoMetadata(urls, photos, mediaFolder = "PortalPhotos", r
       ? { url, weight: getRatingFrequency(photo.rating, ratingFrequencies), orientation: photo.orientation }
       : null;
   });
-  return candidates.every(Boolean) ? candidates : null;
+  return candidates.filter(Boolean);
 }
