@@ -50,17 +50,39 @@ class ScannerTests(unittest.TestCase):
             path.write_bytes(jpeg(rating=None))
             self.assertEqual(_jpeg_metadata(path), (1200, 800, 0))
 
-    def test_scanner_assigns_orientation_and_minimum_weight(self):
+    def test_scanner_assigns_orientation_and_zero_weight_to_unrated(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "portrait.jpg").write_bytes(jpeg(800, 1200, 0))
             (root / "landscape.jpg").write_bytes(jpeg(1600, 900, 5))
             photos, summary = scan_photo_directory(root, {})
             self.assertEqual(photos["portrait.jpg"]["orientation"], "portrait")
-            self.assertEqual(photos["portrait.jpg"]["weight"], 1)
+            self.assertEqual(photos["portrait.jpg"]["weight"], 0)
             self.assertEqual(photos["landscape.jpg"]["orientation"], "landscape")
             self.assertEqual(photos["landscape.jpg"]["weight"], 5)
             self.assertEqual(summary["added"], 2)
+
+    def test_malformed_xmp_is_reported_and_cached(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            packet = XMP_HEADER + b"<invalid"
+            original = jpeg(rating=None)
+            app1 = b"\\xff\\xe1" + (len(packet) + 2).to_bytes(2, "big") + packet
+            (root / "bad_xmp.jpg").write_bytes(original[:2] + app1 + original[2:])
+            photos, summary = scan_photo_directory(root, {})
+            self.assertEqual(photos["bad_xmp.jpg"]["rating"], 0)
+            self.assertEqual(summary["exception_count"], 1)
+            self.assertIn("Malformed XMP", summary["exceptions"][0]["reason"])
+            _, cached_summary = scan_photo_directory(root, photos)
+            self.assertEqual(cached_summary["exception_count"], 1)
+
+    def test_missing_dimensions_excluded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "broken.jpg").write_bytes(b"\\xff\\xd8\\xff\\xd9")
+            photos, summary = scan_photo_directory(root, {})
+            self.assertEqual(photos, {})
+            self.assertEqual(summary["unreadable"], 1)
 
     def test_unreadable_image_is_pruned_and_retried_next_scan(self):
         with tempfile.TemporaryDirectory() as directory:
