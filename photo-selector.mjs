@@ -76,7 +76,8 @@ export function matchPhotoMetadata(urls, photos, mediaFolder = "PortalPhotos", r
     } catch (_error) {
       relativePath = url.slice(position + marker.length);
     }
-    if (folderPrefix && relativePath.startsWith(folderPrefix)) {
+    if (folderPrefix) {
+      if (!relativePath.startsWith(folderPrefix)) return null;
       relativePath = relativePath.slice(folderPrefix.length);
     }
     const photo = metadata.get(relativePath);
