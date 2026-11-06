@@ -77,7 +77,7 @@ const defaultConfig = {
 	media_list_max_size: 500,
 	media_order: "random", // sorted / random / random_but_synced / random_path
 	photo_selector_enabled: false, // Use WallPanel Photo Selector metadata for local media sources
-		photo_selector_history_size: 5, // Number of recently displayed photos to avoid after a list refresh (0 disables)
+	photo_selector_history_size: 5, // Number of recently displayed photos to avoid after a list refresh (0 disables)
 	exclude_filenames: [], // Excluded filenames (regex)
 	exclude_media_types: [], // Exclude media types (image / video)
 	exclude_media_orientation: "", // Exclude media items with this orientation (landscape / portrait / auto)
@@ -3343,7 +3343,7 @@ function initWallpanel() {
 				const folderPrefix = result.media_folder ? `${result.media_folder}/` : "";
 				const candidates = urls.map((url) => {
 					const marker = "/local/";
-						const position = url.indexOf(marker);
+					const position = url.indexOf(marker);
 					if (position < 0) return null;
 					let relativePath;
 					try {
