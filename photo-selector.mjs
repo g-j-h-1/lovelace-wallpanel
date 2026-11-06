@@ -9,7 +9,8 @@ export function orderPhotos(items, recent = [], historySize = 5, random = Math.r
   }));
   const orientationByUrl = new Map(candidates.map((item) => [item.url, item.orientation]));
   const ordered = [];
-  // Continue the orientation rule from the last image shown before a list refresh.\n  let previousOrientation = recent.length ? (orientationByUrl.get(recent[recent.length - 1]) || null) : null;
+  // Continue the orientation rule from the last image shown before a list refresh.
+  let previousOrientation = recent.length ? (orientationByUrl.get(recent[recent.length - 1]) || null) : null;
 
   while (candidates.length) {
     let eligible = candidates;
