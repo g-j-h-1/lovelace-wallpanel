@@ -134,3 +134,11 @@ wallpanel:
 ```
 
 For `20261025_Rugby vs Leicester_IMG1234.jpg`, segment `0` is `20261025`, segment `1` is `Rugby vs Leicester`, and segment `2` is `IMG1234`. The filename extension is excluded before splitting. Change `image_info_filename_separator` to any literal separator, including multi-character separators such as `--`. The original `${image.filename}` remains available.
+
+### Automatic and manual photo rescans
+
+The Home Assistant integration scans the configured media directory on startup and automatically repeats scans at the configured `scan_interval` (minutes; default 15). The next scheduled scan is measured from the completion of the previous scan.
+
+To rescan immediately, open **Settings → Devices & services → Devices → WallPanel Photo Selector** and press **Rescan photos**. You can also use the Home Assistant `button.press` action on the new `button.*_rescan_photos` entity in an automation. The **Scan status** and **Last scan** sensors show progress and completion. Automatic and manual scans are serialized to prevent overlapping work.
+
+After installing a new integration release through HACS, restart Home Assistant to load the Python integration changes and register the new button.
