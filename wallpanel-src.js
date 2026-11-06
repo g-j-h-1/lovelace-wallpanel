@@ -1,4 +1,4 @@
-import { orderPhotos } from "./photo-selector.js";
+import { orderPhotos } from "./photo-selector.mjs";
 
 /**
  * (C) 2020-2026 by Jan Schneider (oss@janschneider.net)
