@@ -2,7 +2,7 @@ name: Photo Selector validation
 
 on:
   push:
-    branches: [photo-selection]
+    branches: [photo-selection, main]
     paths:
       - 'photo-selector.mjs'
       - 'wallpanel-src.js'
@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test-and-build:
@@ -47,6 +47,16 @@ jobs:
           grep -q 'show_on_orientation' wallpanel.js
           grep -q 'photo_selector_rating_frequencies' wallpanel.js
           grep -q 'photo_selector_history_size' wallpanel.js
+      - name: Commit compiled frontend on main
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          if ! git diff --quiet -- wallpanel.js || ! git ls-files --error-unmatch wallpanel.js >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add wallpanel.js
+            git commit -m "Build wallpanel.js for HACS"
+            git push
+          fi
       - name: Upload built frontend
         uses: actions/upload-artifact@v4
         with:
