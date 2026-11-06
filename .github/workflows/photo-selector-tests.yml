@@ -5,13 +5,25 @@ on:
     branches: [photo-selection]
     paths:
       - "custom_components/wallpanel_photo_selector/**"
-      - "tests/test_wallpanel_photo_selector_scanner.py"\n      - "tests/photo-selector.test.mjs"\n      - "photo-selector.mjs"\n      - "wallpanel-src.js"
+      - "tests/test_wallpanel_photo_selector_scanner.py"
+      - "tests/photo-selector.test.mjs"
+      - "photo-selector.mjs"
+      - "wallpanel-src.js"
+      - "package.json"
+      - "package-lock.json"
+      - "rollup.config.js"
       - ".github/workflows/photo-selector-tests.yml"
   pull_request:
     branches: [photo-selection]
     paths:
       - "custom_components/wallpanel_photo_selector/**"
       - "tests/test_wallpanel_photo_selector_scanner.py"
+      - "tests/photo-selector.test.mjs"
+      - "photo-selector.mjs"
+      - "wallpanel-src.js"
+      - "package.json"
+      - "package-lock.json"
+      - "rollup.config.js"
       - ".github/workflows/photo-selector-tests.yml"
 
 jobs:
@@ -26,3 +38,20 @@ jobs:
           python-version: "3.12"
       - name: Run scanner unit tests
         run: python -m unittest discover -s tests -v
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - name: Run photo selector unit tests
+        run: node --test tests/photo-selector.test.mjs
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Build WallPanel frontend
+        run: npm run build
