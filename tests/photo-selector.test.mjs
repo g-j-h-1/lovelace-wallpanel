@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { matchPhotoMetadata, orderPhotos } from "../photo-selector.mjs";
+import { getRatingFrequency, matchPhotoMetadata, orderPhotos } from "../photo-selector.mjs";
 
 const stableRandom = () => 0.5;
 
@@ -90,4 +90,34 @@ test("metadata matching rejects non-local media source identifiers", () => {
   const urls = ["media-source://media_source/other/PortalPhotos/photo.jpg"];
   const photos = [{ path: "photo.jpg", rating: 3, orientation: "landscape" }];
   assert.equal(matchPhotoMetadata(urls, photos, "PortalPhotos"), null);
+});
+
+
+test("default rating frequencies preserve the existing relative weighting", () => {
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map((rating) => getRatingFrequency(rating)), [1, 1, 2, 3, 4, 5]);
+});
+
+test("configured frequency overrides defaults and zero excludes a rating", () => {
+  const urls = [
+    "media-source://media_source/local/PortalPhotos/unrated.jpg",
+    "media-source://media_source/local/PortalPhotos/one.jpg",
+    "media-source://media_source/local/PortalPhotos/five.jpg",
+  ];
+  const photos = [
+    { path: "unrated.jpg", rating: 0, orientation: "landscape" },
+    { path: "one.jpg", rating: 1, orientation: "landscape" },
+    { path: "five.jpg", rating: 5, orientation: "landscape" },
+  ];
+  const candidates = matchPhotoMetadata(urls, photos, "PortalPhotos", { 0: 0, 1: 3, 5: 0 });
+  assert.deepEqual(candidates.map((item) => item.weight), [0, 3, 0]);
+  assert.deepEqual(orderPhotos(candidates, [], 0, stableRandom), [urls[1]]);
+});
+
+test("orderPhotos never returns photos with zero or invalid weights", () => {
+  const photos = [
+    { url: "excluded", orientation: "landscape", weight: 0 },
+    { url: "invalid", orientation: "landscape", weight: -1 },
+    { url: "included", orientation: "landscape", weight: 2 },
+  ];
+  assert.deepEqual(orderPhotos(photos, [], 0, stableRandom), ["included"]);
 });
