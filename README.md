@@ -1,8 +1,8 @@
 # WallPanel
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/g-j-h-1/lovelace-wallpanel?style=for-the-badge)](https://github.com/g-j-h-1/lovelace-wallpanel-photo-selector/releases)
-[![GitHub stars](https://img.shields.io/github/stars/g-j-h-1/lovelace-wallpanel?color=yellow&style=for-the-badge)](https://github.com/g-j-h-1/lovelace-wallpanel-photo-selector/stargazers)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/g-j-h-1/lovelace-wallpanel-photo-selector?style=for-the-badge)](https://github.com/g-j-h-1/lovelace-wallpanel-photo-selector/releases)
+[![GitHub stars](https://img.shields.io/github/stars/g-j-h-1/lovelace-wallpanel-photo-selector?color=yellow&style=for-the-badge)](https://github.com/g-j-h-1/lovelace-wallpanel-photo-selector/stargazers)
 ![GitHub All Releases](https://img.shields.io/github/downloads/g-j-h-1/lovelace-wallpanel-photo-selector/total.svg?color=green&style=for-the-badge)
 [![Documentation](https://img.shields.io/badge/view-Documentation-blue?style=for-the-badge)](https://g-j-h-1.github.io/lovelace-wallpanel-photo-selector/ "Go to WallPanel documentation")
 
@@ -57,6 +57,48 @@ wallpanel:
 
 After saving and closing the dashboard configuration, WallPanel should now be active for this dashboard.
 The sidebar should be hidden and the screensaver should start after an idle time of 10 seconds.
+
+## Photo Selector: orientation-aware cards
+
+With the optional WallPanel Photo Selector integration enabled, individual screensaver
+cards can be shown only for particular photograph orientations. The orientation is
+determined from the loaded image's actual dimensions when the image becomes active.
+
+```yaml
+wallpanel:
+  enabled: true
+  image_url: media-source://media_source/local/PortalPhotos
+  media_order: random
+  photo_selector_enabled: true
+  photo_selector_history_size: 50
+  cards:
+    - type: custom:digital-clock
+      timeFormat:
+        hour: 2-digit
+        minute: 2-digit
+      dateFormat:
+        weekday: long
+        day: 2-digit
+        month: long
+    - type: entities
+      show_on_orientation: landscape
+      entities:
+        - entity: sensor.vodafone
+          name: Vodafone (GBp)
+    - type: weather-forecast
+      show_on_orientation: landscape
+      entity: weather.forecast_home
+      forecast_type: daily
+```
+
+Cards without `show_on_orientation` are always displayed. Supported values are
+`portrait`, `landscape`, `square`, and `unknown`. To permit more than one
+orientation, supply a list, for example `show_on_orientation: [landscape, square]`.
+Hidden cards take up no layout space. Unknown dimensions match only `unknown`.
+
+The effective history exclusion is automatically capped at 25% of the number of
+eligible photographs on that dashboard (rounded down). Filename and rating
+exclusions are applied before calculating this cap.
 
 ## Documentation
 Further information can be found in the [WallPanel Documentation](https://j-a-n.github.io/lovelace-wallpanel/).

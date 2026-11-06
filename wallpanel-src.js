@@ -1,3 +1,5 @@
+import { matchPhotoMetadata, selectPhoto, filterPhotos, effectiveHistorySize } from "./photo-selector.mjs";
+
 /**
  * (C) 2020-2026 by Jan Schneider (oss@janschneider.net)
  * Released under the GNU General Public License v3.0
@@ -74,6 +76,12 @@ const defaultConfig = {
 	media_list_update_interval: 3600,
 	media_list_max_size: 500,
 	media_order: "random", // sorted / random / random_but_synced / random_path
+	photo_selector_enabled: false, // Use WallPanel Photo Selector metadata for local media sources
+	photo_selector_history_size: 5, // Number of recently displayed photos to avoid (0 disables)
+	photo_selector_filename_include: "",
+	photo_selector_filename_exclude: "",
+	photo_selector_show_filename: false,
+	photo_selector_rating_frequencies: { 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 }, // Relative selection weights by Lightroom rating; 0 excludes that rating
 	exclude_filenames: [], // Excluded filenames (regex)
 	exclude_media_types: [], // Exclude media types (image / video)
 	exclude_media_orientation: "", // Exclude media items with this orientation (landscape / portrait / auto)
@@ -2161,6 +2169,7 @@ function initWallpanel() {
 			this.__badges = [];
 			this.__cards = [];
 			this.__views = [];
+			this.orientationCardRules = [];
 			this.energyCollectionUpdateEnabled = false;
 
 			this.shadowRoot.querySelectorAll(".wp-card").forEach((card) => {
@@ -2271,6 +2280,8 @@ function initWallpanel() {
 				config.cards.forEach((card) => {
 					// Copy object
 					const cardConfig = JSON.parse(JSON.stringify(card));
+					const showOnOrientation = cardConfig.show_on_orientation;
+					delete cardConfig.show_on_orientation;
 					logger.debug("Creating card:", cardConfig);
 					let style = {};
 					if (cardConfig.wp_style) {
@@ -2313,10 +2324,27 @@ function initWallpanel() {
 
 					cardContainer.append(cardElement);
 					parent.appendChild(cardContainer);
+					if (showOnOrientation !== undefined) {
+						const allowed = Array.isArray(showOnOrientation) ? showOnOrientation : [showOnOrientation];
+						this.orientationCardRules.push({ element: cardContainer, allowed: allowed.map(value => String(value).toLowerCase()) });
+						if (this.currentPhotoOrientation) {
+							cardContainer.style.display = this.orientationCardRules.at(-1).allowed.includes(this.currentPhotoOrientation) ? "" : "none";
+						}
+					}
 				});
 			}
 
 			setTimeout(this.updateShadowStyle.bind(this), 500);
+		}
+
+		updateOrientationCardVisibility(mediaElement) {
+			const width = mediaElement.naturalWidth || mediaElement.videoWidth || 0;
+			const height = mediaElement.naturalHeight || mediaElement.videoHeight || 0;
+			const orientation = width && height ? (width > height ? "landscape" : height > width ? "portrait" : "square") : "unknown";
+			this.currentPhotoOrientation = orientation;
+			for (const rule of this.orientationCardRules || []) {
+				rule.element.style.display = rule.allowed.includes(orientation) ? "" : "none";
+			}
 		}
 
 		setDisplayTime() {
@@ -2574,6 +2602,10 @@ function initWallpanel() {
 			this.imageOneInfo.id = "wallpanel-screensaver-image-one-info";
 
 			this.imageOneInfoContainer.appendChild(this.imageOneInfo);
+			this.imageOneFilename = document.createElement("div");
+			this.imageOneFilename.style.cssText = "position:absolute;bottom:8px;right:12px;z-index:10;font-size:12px;color:white;text-shadow:0 1px 3px black;text-align:right;pointer-events:none;max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+			this.imageOneFilename.style.display = "none";
+			this.imageOneContainer.appendChild(this.imageOneFilename);
 			this.imageOneContainer.appendChild(this.imageOneBackground);
 			this.imageOneContainer.appendChild(this.imageOne);
 			this.imageOneContainer.appendChild(this.imageOneInfoContainer);
@@ -2598,6 +2630,10 @@ function initWallpanel() {
 			this.imageTwoInfo.id = "wallpanel-screensaver-image-two-info";
 
 			this.imageTwoInfoContainer.appendChild(this.imageTwoInfo);
+			this.imageTwoFilename = document.createElement("div");
+			this.imageTwoFilename.style.cssText = "position:absolute;bottom:8px;right:12px;z-index:10;font-size:12px;color:white;text-shadow:0 1px 3px black;text-align:right;pointer-events:none;max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+			this.imageTwoFilename.style.display = "none";
+			this.imageTwoContainer.appendChild(this.imageTwoFilename);
 			this.imageTwoContainer.appendChild(this.imageTwoBackground);
 			this.imageTwoContainer.appendChild(this.imageTwo);
 			this.imageTwoContainer.appendChild(this.imageTwoInfoContainer);
@@ -3329,6 +3365,22 @@ function initWallpanel() {
 			}
 		}
 
+		async applyPhotoSelectorOrder(urls) {
+			this.photoSelectorCandidates = null;
+			if (!config.photo_selector_enabled || !mediaSourceType().startsWith("media-source")) return urls;
+			try {
+				const result = await this.hass.callWS({ type: "wallpanel_photo_selector/photos" });
+				const matched = matchPhotoMetadata(urls, result.photos, result.media_folder, config.photo_selector_rating_frequencies);
+				const candidates = filterPhotos(matched, config.photo_selector_filename_include, config.photo_selector_filename_exclude);
+				this.photoSelectorCandidates = candidates;
+				logger.debug("Photo Selector: indexed", { total: urls.length, matched: matched.length, filtered: candidates.length, eligible: candidates.filter(item => item.weight > 0).length });
+				return candidates.map(item => item.url);
+			} catch (error) {
+				logger.warn("Photo Selector unavailable or invalid filename filter", error);
+				return [];
+			}
+		}
+
 		async updateMediaListFromMediaSource() {
 			const mediaContentId = config.image_url;
 			const wp = this;
@@ -3342,7 +3394,9 @@ function initWallpanel() {
 
 				wp.resetMediaPathLists();
 				let urls = pathLists.flatMap((pathList) => pathList.medias);
-				if (config.media_order == "random") {
+				if (config.photo_selector_enabled && config.media_order == "random") {
+					urls = await wp.applyPhotoSelectorOrder(urls);
+				} else if (config.media_order == "random") {
 					urls = shuffleArray(urls);
 				} else if (config.media_order == "random_but_synced") {
 					// Sort for a stable base, then shuffle with a fixed seed so every
@@ -3351,7 +3405,7 @@ function initWallpanel() {
 				} else {
 					urls = urls.sort(); // Sort consistently if not random
 				}
-				wp.mediaList = wp.limitMediaList(urls);
+				wp.mediaList = config.photo_selector_enabled && config.media_order == "random" && wp.photoSelectorCandidates ? urls : wp.limitMediaList(urls);
 			} catch (error) {
 				// Error is logged in findMediaPathLists, re-throw for updateMediaList handler
 				throw new Error(`Failed to update image list from ${config.image_url}: ${error.message || stringify(error)}`);
@@ -4050,6 +4104,16 @@ function initWallpanel() {
 			if (!this.mediaList.length) {
 				return null;
 			}
+			if (config.photo_selector_enabled && config.media_order == "random" && this.photoSelectorCandidates) {
+				const historySize = effectiveHistorySize(this.photoSelectorCandidates, config.photo_selector_history_size ?? 5);
+				const recent = (this.photoSelectorRecent || []).slice(-Math.max(1, historySize));
+				const selected = selectPhoto(this.photoSelectorCandidates, recent, historySize);
+				if (updateIndex && selected) {
+					this.photoSelectorRecent = [...recent, selected].slice(-Math.max(1, historySize));
+					this.mediaIndex = this.mediaList.indexOf(selected);
+				}
+				return selected;
+			}
 			let mediaIndex;
 			if (config.media_order == "random_but_synced") {
 				// Wall-clock derived index: every device shows the same item, and a
@@ -4073,6 +4137,14 @@ function initWallpanel() {
 			}
 			if (updateIndex) {
 				this.mediaIndex = mediaIndex;
+				if (config.photo_selector_enabled && config.media_order == "random") {
+					const historySize = effectiveHistorySize(
+						this.photoSelectorCandidates || [],
+						config.photo_selector_history_size ?? 5
+					);
+					this.photoSelectorRecent = [...(this.photoSelectorRecent || []), this.mediaList[mediaIndex]]
+						.slice(-Math.max(1, historySize));
+				}
 			}
 			return this.mediaList[mediaIndex];
 		}
@@ -4129,6 +4201,16 @@ function initWallpanel() {
 			}
 
 			if (mediaType == "video") {
+				const filenameOverlay = element === this.imageOne ? this.imageOneFilename : element === this.imageTwo ? this.imageTwoFilename : null;
+				if (filenameOverlay) {
+					const show = config.photo_selector_show_filename && config.photo_selector_enabled;
+					filenameOverlay.style.display = show ? "block" : "none";
+					if (show) {
+						const raw = element.mediaUrl.split("/").at(-1).split("?")[0];
+						try { filenameOverlay.textContent = decodeURIComponent(raw); }
+						catch (_error) { filenameOverlay.textContent = raw; }
+					}
+				}
 				element.infoCacheUrl = element.mediaUrl;
 				attributesToMediaInfoCache();
 				element = this.replaceMediaElement(element, "ha-camera-stream");
@@ -4584,6 +4666,7 @@ function initWallpanel() {
 
 			this.setMediaDataInfo();
 			this.setMediaDimensions();
+			this.updateOrientationCardVisibility(newMedia);
 			this.setImageURLEntityState();
 			this.startPlayingActiveMedia();
 			this.restartProgressBarAnimation();

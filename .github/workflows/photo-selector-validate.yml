@@ -1,0 +1,55 @@
+name: Photo Selector validation
+
+on:
+  push:
+    branches: [photo-selection]
+    paths:
+      - 'photo-selector.mjs'
+      - 'wallpanel-src.js'
+      - 'custom_components/wallpanel_photo_selector/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/photo-selector-validate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check JavaScript syntax
+        run: |
+          node --check wallpanel-src.js
+          node --check photo-selector.mjs
+      - name: JavaScript unit tests
+        run: node --test tests/*.test.mjs tests/*.test.cjs
+      - name: Python scanner tests
+        run: python -m unittest discover -s tests -p 'test_wallpanel_photo_selector_scanner.py'
+      - name: Install build dependencies
+        run: npm ci
+      - name: Build wallpanel.js
+        run: npm run build
+      - name: Verify compiled bundle contains Photo Selector features
+        run: |
+          test -s wallpanel.js
+          grep -q 'show_on_orientation' wallpanel.js
+          grep -q 'photo_selector_rating_frequencies' wallpanel.js
+          grep -q 'photo_selector_history_size' wallpanel.js
+      - name: Upload built frontend
+        uses: actions/upload-artifact@v4
+        with:
+          name: wallpanel-photo-selector-build
+          path: wallpanel.js
+          if-no-files-found: error
