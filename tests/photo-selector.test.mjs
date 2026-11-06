@@ -57,3 +57,12 @@ test("malformed URL escape does not abort filename filtering", () => {
   const result = filterPhotos([{url:"/local/photo%ZZ.jpg"}], "photo", "");
   assert.equal(result.length, 1);
 });
+
+test("metadata matching is restricted to the indexed media folder", () => {
+  const urls = [
+    "media-source://media_source/local/PortalPhotos/known.jpg",
+    "media-source://media_source/local/OtherPhotos/known.jpg"
+  ];
+  const matched = matchPhotoMetadata(urls, [{path:"known.jpg",rating:5,orientation:"landscape"}], "PortalPhotos");
+  assert.deepEqual(matched.map(item => item.url), [urls[0]]);
+});
