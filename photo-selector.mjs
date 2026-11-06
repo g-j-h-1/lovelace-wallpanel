@@ -2,11 +2,20 @@
  * Photo ordering for the WallPanel Photo Selector.
  * Kept independent of the card so the selection rules can be unit-tested.
  */
+export const DEFAULT_RATING_FREQUENCIES = Object.freeze({ 0: 1, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 });
+
+export function getRatingFrequency(rating, frequencies = {}) {
+  const key = String(Math.max(0, Math.min(5, Number(rating) || 0)));
+  const configured = frequencies && Object.prototype.hasOwnProperty.call(frequencies, key)
+    ? Number(frequencies[key])
+    : DEFAULT_RATING_FREQUENCIES[key];
+  return Number.isFinite(configured) ? Math.max(0, configured) : DEFAULT_RATING_FREQUENCIES[key];
+}
+
 export function orderPhotos(items, recent = [], historySize = 5, random = Math.random) {
-  const candidates = items.map((item) => ({
-    ...item,
-    weight: Math.max(1, Number(item.weight) || 1),
-  }));
+  const candidates = items
+    .map((item) => ({ ...item, weight: Number(item.weight) }))
+    .filter((item) => Number.isFinite(item.weight) && item.weight > 0);
   const orientationByUrl = new Map(candidates.map((item) => [item.url, item.orientation]));
   const ordered = [];
   // Continue the orientation rule from the last image shown before a list refresh.
@@ -49,7 +58,7 @@ export function orderPhotos(items, recent = [], historySize = 5, random = Math.r
  * WallPanel's media browser supplies IDs such as
  * media-source://media_source/local/PortalPhotos/album/photo.jpg.
  */
-export function matchPhotoMetadata(urls, photos, mediaFolder = "PortalPhotos") {
+export function matchPhotoMetadata(urls, photos, mediaFolder = "PortalPhotos", ratingFrequencies = {}) {
   const metadata = new Map((photos || []).map((photo) => [photo.path, photo]));
   const folderPrefix = mediaFolder ? `${mediaFolder}/` : "";
   const candidates = urls.map((url) => {
@@ -67,7 +76,7 @@ export function matchPhotoMetadata(urls, photos, mediaFolder = "PortalPhotos") {
     }
     const photo = metadata.get(relativePath);
     return photo
-      ? { url, weight: Math.max(1, Number(photo.rating) || 0), orientation: photo.orientation }
+      ? { url, weight: getRatingFrequency(photo.rating, ratingFrequencies), orientation: photo.orientation }
       : null;
   });
   return candidates.every(Boolean) ? candidates : null;
