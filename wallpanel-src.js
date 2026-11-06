@@ -2582,6 +2582,10 @@ function initWallpanel() {
 			this.imageOneInfo.id = "wallpanel-screensaver-image-one-info";
 
 			this.imageOneInfoContainer.appendChild(this.imageOneInfo);
+			this.imageOneFilename = document.createElement("div");
+			this.imageOneFilename.style.cssText = "position:absolute;bottom:8px;right:12px;z-index:10;font-size:12px;color:white;text-shadow:0 1px 3px black;text-align:right;pointer-events:none;max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+			this.imageOneFilename.style.display = "none";
+			this.imageOneContainer.appendChild(this.imageOneFilename);
 			this.imageOneContainer.appendChild(this.imageOneBackground);
 			this.imageOneContainer.appendChild(this.imageOne);
 			this.imageOneContainer.appendChild(this.imageOneInfoContainer);
@@ -2606,6 +2610,10 @@ function initWallpanel() {
 			this.imageTwoInfo.id = "wallpanel-screensaver-image-two-info";
 
 			this.imageTwoInfoContainer.appendChild(this.imageTwoInfo);
+			this.imageTwoFilename = document.createElement("div");
+			this.imageTwoFilename.style.cssText = "position:absolute;bottom:8px;right:12px;z-index:10;font-size:12px;color:white;text-shadow:0 1px 3px black;text-align:right;pointer-events:none;max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+			this.imageTwoFilename.style.display = "none";
+			this.imageTwoContainer.appendChild(this.imageTwoFilename);
 			this.imageTwoContainer.appendChild(this.imageTwoBackground);
 			this.imageTwoContainer.appendChild(this.imageTwo);
 			this.imageTwoContainer.appendChild(this.imageTwoInfoContainer);
@@ -4173,6 +4181,16 @@ function initWallpanel() {
 			}
 
 			if (mediaType == "video") {
+				const filenameOverlay = element === this.imageOne ? this.imageOneFilename : element === this.imageTwo ? this.imageTwoFilename : null;
+				if (filenameOverlay) {
+					const show = config.photo_selector_show_filename && config.photo_selector_enabled;
+					filenameOverlay.style.display = show ? "block" : "none";
+					if (show) {
+						const raw = element.mediaUrl.split("/").at(-1).split("?")[0];
+						try { filenameOverlay.textContent = decodeURIComponent(raw); }
+						catch (_error) { filenameOverlay.textContent = raw; }
+					}
+				}
 				element.infoCacheUrl = element.mediaUrl;
 				attributesToMediaInfoCache();
 				element = this.replaceMediaElement(element, "ha-camera-stream");
