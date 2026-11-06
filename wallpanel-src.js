@@ -3385,7 +3385,7 @@ function initWallpanel() {
 				} else {
 					urls = urls.sort(); // Sort consistently if not random
 				}
-				wp.mediaList = wp.limitMediaList(urls);
+				wp.mediaList = config.photo_selector_enabled && config.media_order == "random" && wp.photoSelectorCandidates ? urls : wp.limitMediaList(urls);
 			} catch (error) {
 				// Error is logged in findMediaPathLists, re-throw for updateMediaList handler
 				throw new Error(`Failed to update image list from ${config.image_url}: ${error.message || stringify(error)}`);
