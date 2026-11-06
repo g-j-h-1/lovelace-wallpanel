@@ -67,7 +67,7 @@ class ScannerTests(unittest.TestCase):
             root = Path(directory)
             packet = XMP_HEADER + b"<invalid"
             original = jpeg(rating=None)
-            app1 = b"\\xff\\xe1" + (len(packet) + 2).to_bytes(2, "big") + packet
+            app1 = b"\xff\xe1" + (len(packet) + 2).to_bytes(2, "big") + packet
             (root / "bad_xmp.jpg").write_bytes(original[:2] + app1 + original[2:])
             photos, summary = scan_photo_directory(root, {})
             self.assertEqual(photos["bad_xmp.jpg"]["rating"], 0)
@@ -79,7 +79,7 @@ class ScannerTests(unittest.TestCase):
     def test_missing_dimensions_excluded(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "broken.jpg").write_bytes(b"\\xff\\xd8\\xff\\xd9")
+            (root / "broken.jpg").write_bytes(b"\xff\xd8\xff\xd9")
             photos, summary = scan_photo_directory(root, {})
             self.assertEqual(photos, {})
             self.assertEqual(summary["unreadable"], 1)
