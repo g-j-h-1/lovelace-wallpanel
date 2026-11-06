@@ -20,7 +20,7 @@ export function selectPhoto(items, recent = [], historySize = 5, random = Math.r
   const previous = pool.find(item => item.url === last);
   const requireLandscape = previous?.orientation === "portrait" && pool.some(item => item.orientation === "landscape");
   const oriented = requireLandscape ? pool.filter(item => item.orientation === "landscape") : pool;
-  const history = recent.slice(-Math.max(0, historySize));
+  const history = historySize > 0 ? recent.slice(-historySize) : [];
   let eligible = oriented.filter(item => !history.includes(item.url));
   // For small collections relax the oldest exclusions, never rating-zero exclusions.
   for (let n = 1; !eligible.length && n <= history.length; n++) {
