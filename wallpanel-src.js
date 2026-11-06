@@ -4086,10 +4086,10 @@ function initWallpanel() {
 			}
 			if (config.photo_selector_enabled && config.media_order == "random" && this.photoSelectorCandidates) {
 				const historySize = Math.max(0, Math.min(100, Number(config.photo_selector_history_size ?? 5) || 0));
-				const recent = (this.photoSelectorRecent || []).slice(-historySize);
+				const recent = (this.photoSelectorRecent || []).slice(-Math.max(1, historySize));
 				const selected = selectPhoto(this.photoSelectorCandidates, recent, historySize);
 				if (updateIndex && selected) {
-					this.photoSelectorRecent = historySize ? [...recent, selected].slice(-historySize) : [];
+					this.photoSelectorRecent = [...recent, selected].slice(-Math.max(1, historySize));
 					this.mediaIndex = this.mediaList.indexOf(selected);
 				}
 				return selected;
